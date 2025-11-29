@@ -190,7 +190,7 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
                   setValue("categoryId", "");
                   setValue("paidFromAccountId", "");
                 } else {
-                  setValue("budgetItemId", value);
+                  setValue("budgetItemId", value as string | undefined);
                 }
               }}
             >
