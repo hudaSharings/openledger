@@ -57,11 +57,24 @@ This guide will walk you through deploying your OpenLedger application to Vercel
    - **Output Directory**: `.next` (default)
    - **Install Command**: `npm install` (default)
 
-3. **Environment Variables**:
-   Add these environment variables in Vercel dashboard:
+3. **Environment Variables** (CRITICAL - Must be set before first deployment):
+   
+   **⚠️ IMPORTANT**: You MUST set these environment variables in Vercel BEFORE deploying, otherwise the build will fail!
+   
+   Go to: **Project Settings → Environment Variables**
+   
+   Add these environment variables:
    - `DATABASE_URL`: Your Neon PostgreSQL connection string
+     - Value: `postgresql://user:password@host/database?sslmode=require`
+     - **Environment**: Production, Preview, Development (select all)
+   
    - `NEXTAUTH_SECRET`: Generate a random secret (see below)
-   - `NEXTAUTH_URL`: Your Vercel deployment URL (e.g., `https://your-app.vercel.app`)
+     - **Environment**: Production, Preview, Development (select all)
+   
+   - `NEXTAUTH_URL`: Your Vercel deployment URL
+     - Value: `https://your-app.vercel.app` (or your custom domain)
+     - **Environment**: Production, Preview, Development (select all)
+     - Note: Vercel will auto-set this, but you can override if needed
 
    **Generate NEXTAUTH_SECRET**:
    ```bash
@@ -71,6 +84,11 @@ This guide will walk you through deploying your OpenLedger application to Vercel
    # On Windows PowerShell
    [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
    ```
+   
+   **⚠️ CRITICAL**: After adding environment variables, you MUST:
+   1. Save the environment variables
+   2. Redeploy the project (or wait for automatic redeploy)
+   3. The build will now succeed because DATABASE_URL is available
 
 4. **Deploy**:
    - Click "Deploy"
