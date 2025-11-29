@@ -45,7 +45,18 @@ export function Navbar() {
     <>
       <nav className="border-b bg-white shadow-sm sticky top-0 z-50">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-4 md:gap-8">
+          <div className="flex items-center gap-3 md:gap-8">
+            {/* Mobile Menu Button - on left */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+
             <Link 
               href="/" 
               className="text-lg md:text-xl font-bold text-blue-600 hover:text-blue-700 transition-colors"
@@ -85,17 +96,6 @@ export function Navbar() {
               className="hidden md:flex hover:bg-gray-50"
             >
               Sign Out
-            </Button>
-
-            {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Open menu"
-            >
-              <Menu className="h-5 w-5" />
             </Button>
           </div>
         </div>
