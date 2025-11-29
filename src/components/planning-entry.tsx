@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { budgetItemSchema } from "@/src/lib/validations";
-import { createBudgetItem, getCategories, getPaymentAccounts, getBudgetItems } from "@/src/lib/actions/financial";
+import { createBudgetItem, updateBudgetItem, deleteBudgetItem, getCategories, getPaymentAccounts, getBudgetItems } from "@/src/lib/actions/financial";
 import { getExpenseTemplates, createExpenseTemplate, copyBudgetFromMonth } from "@/src/lib/actions/templates";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -161,7 +161,16 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
     setError(null);
     setSuccess(false);
     try {
-      const result = await createBudgetItem(data);
+      let result;
+      if (editingItem) {
+        // Update existing item - remove monthYear from data
+        const { monthYear: _, ...updateData } = data;
+        result = await updateBudgetItem(editingItem.id, updateData);
+      } else {
+        // Create new item
+        result = await createBudgetItem(data);
+      }
+
       if (result.error) {
         setError(result.error);
       } else {
@@ -174,17 +183,20 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
           allocatedToAccountId: "",
           color: "blue",
         });
+        setEditingItem(null);
         // Reload budget items
         const items = await getBudgetItems(monthYear);
         setBudgetItems(items);
         // Close dialog after short delay
         setTimeout(() => {
           setAddItemDialogOpen(false);
+          setEditDialogOpen(false);
           setSuccess(false);
         }, 1500);
       }
-    } catch (err) {
-      setError("Failed to create budget item");
+    } catch (err: any) {
+      console.error("Error submitting form:", err);
+      setError(editingItem ? `Failed to update budget item: ${err.message || err.toString()}` : `Failed to create budget item: ${err.message || err.toString()}`);
     }
   };
 
@@ -258,10 +270,74 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
         allocatedToAccountId: "",
         color: "blue",
       });
+      setEditingItem(null);
       setError(null);
       setSuccess(false);
       setShowTemplateSearch(false);
       setSearchQuery("");
+    }
+  };
+
+  const handleEditDialogOpenChange = (open: boolean) => {
+    setEditDialogOpen(open);
+    if (!open) {
+      setEditingItem(null);
+      setError(null);
+      setSuccess(false);
+      // Reset form when closing
+      reset({
+        monthYear,
+        description: "",
+        amount: "",
+        categoryId: "",
+        allocatedToAccountId: "",
+        color: "blue",
+      });
+    }
+  };
+
+  // Load data when edit dialog opens
+  useEffect(() => {
+    if (editDialogOpen && editingItem) {
+      async function loadData() {
+        const [cats, accs] = await Promise.all([
+          getCategories(),
+          getPaymentAccounts(),
+        ]);
+        setCategories(cats);
+        setAccounts(accs);
+        // Pre-populate form with editing item data
+        setValue("description", editingItem.description);
+        setValue("amount", editingItem.amount);
+        setValue("categoryId", editingItem.categoryId);
+        setValue("allocatedToAccountId", editingItem.accountId);
+        setValue("color", editingItem.color || "blue");
+      }
+      loadData();
+    }
+  }, [editDialogOpen, editingItem, setValue]);
+
+  const handleEdit = (item: BudgetItem) => {
+    setEditingItem(item);
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = async (itemId: string) => {
+    if (!confirm("Are you sure you want to delete this budget item?")) {
+      return;
+    }
+
+    try {
+      const result = await deleteBudgetItem(itemId);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        // Reload budget items
+        const items = await getBudgetItems(monthYear);
+        setBudgetItems(items);
+      }
+    } catch (err) {
+      setError("Failed to delete budget item");
     }
   };
 
@@ -375,20 +451,6 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                 <DialogTitle className="text-xl">Add Budget Item</DialogTitle>
                 <DialogDescription>
                   Plan your monthly expenses and optionally save as template for future use
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
-                {/* Form content - same as before */}
-                {/* ... existing form fields ... */}
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={editDialogOpen} onOpenChange={handleEditDialogOpenChange}>
-            <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-xl">Edit Budget Item</DialogTitle>
-                <DialogDescription>
-                  Update the budget item details
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
@@ -581,7 +643,10 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                     type="button"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => setAddItemDialogOpen(false)}
+                    onClick={() => {
+                      setAddItemDialogOpen(false);
+                      setEditingItem(null);
+                    }}
                     disabled={isSubmitting}
                   >
                     Cancel
@@ -592,6 +657,223 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? "Adding..." : "Add Budget Item"}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={editDialogOpen} onOpenChange={handleEditDialogOpenChange}>
+            <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-xl">Edit Budget Item</DialogTitle>
+                <DialogDescription>
+                  Update the budget item details
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="description">Description</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowTemplateSearch(!showTemplateSearch)}
+                        className="h-7 text-xs gap-1"
+                      >
+                        <Search className="h-3 w-3" />
+                        Templates
+                      </Button>
+                      {description && categoryId && accountId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleSaveAsTemplate}
+                          className="h-7 text-xs gap-1"
+                        >
+                          <Save className="h-3 w-3" />
+                          Save Template
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {showTemplateSearch && (
+                    <div className="border rounded-md p-2 bg-gray-50 space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Search templates..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowTemplateSearch(false)}
+                          className="h-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {filteredTemplates.length === 0 ? (
+                          <p className="text-xs text-gray-500 p-2">No templates found</p>
+                        ) : (
+                          filteredTemplates.map((template) => (
+                            <button
+                              key={template.id}
+                              type="button"
+                              onClick={() => handleUseTemplate(template)}
+                              className="w-full text-left p-2 rounded hover:bg-white text-sm border border-transparent hover:border-blue-200"
+                            >
+                              <div className="font-medium">{template.description}</div>
+                              <div className="text-xs text-gray-500">
+                                ₹{parseFloat(template.amount).toFixed(2)} • {template.categoryName} • {template.accountName}
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <Input
+                    id="description"
+                    {...register("description")}
+                    placeholder="e.g., Monthly Rent, Groceries"
+                    className="h-10"
+                  />
+                  {errors.description && (
+                    <p className="text-sm text-red-500">{errors.description.message as string}</p>
+                  )}
+                </div>
+
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount (₹)</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      {...register("amount")}
+                      placeholder="0.00"
+                      className="h-10"
+                    />
+                    {errors.amount && (
+                      <p className="text-sm text-red-500">{errors.amount.message as string}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="categoryId">Category</Label>
+                    <Select value={categoryId} onValueChange={(value) => setValue("categoryId", value)}>
+                      <SelectTrigger id="categoryId" className="h-10">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name} ({cat.type})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.categoryId && (
+                      <p className="text-sm text-red-500">{errors.categoryId.message as string}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="allocatedToAccountId">Payment Account</Label>
+                    <Select
+                      value={accountId}
+                      onValueChange={(value) => setValue("allocatedToAccountId", value)}
+                    >
+                      <SelectTrigger id="allocatedToAccountId" className="h-10">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.allocatedToAccountId && (
+                      <p className="text-sm text-red-500">
+                        {errors.allocatedToAccountId.message as string}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="color">Row Color</Label>
+                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                      {[
+                        { value: "red", label: "Red", bg: "bg-red-500" },
+                        { value: "yellow", label: "Yellow", bg: "bg-yellow-500" },
+                        { value: "blue", label: "Blue", bg: "bg-blue-500" },
+                        { value: "green", label: "Green", bg: "bg-green-500" },
+                        { value: "purple", label: "Purple", bg: "bg-purple-500" },
+                        { value: "orange", label: "Orange", bg: "bg-orange-500" },
+                        { value: "pink", label: "Pink", bg: "bg-pink-500" },
+                        { value: "gray", label: "Gray", bg: "bg-gray-500" },
+                      ].map((color) => (
+                        <button
+                          key={color.value}
+                          type="button"
+                          onClick={() => setValue("color", color.value)}
+                          className={`h-10 w-full rounded-md border-2 transition-all ${
+                            selectedColor === color.value
+                              ? "border-gray-900 ring-2 ring-offset-2 ring-gray-900"
+                              : "border-gray-300 hover:border-gray-400"
+                          } ${color.bg} flex items-center justify-center text-white text-xs font-medium shadow-sm`}
+                          title={color.label}
+                        >
+                          {selectedColor === color.value && "✓"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500">Select a color to highlight this budget item in the table</p>
+                    {errors.color && (
+                      <p className="text-sm text-red-500">{errors.color.message as string}</p>
+                    )}
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                )}
+                {success && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-600 font-medium">✓ Budget item updated successfully!</p>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setEditDialogOpen(false);
+                      setEditingItem(null);
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               </form>
@@ -684,7 +966,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                     <TableHead className="text-right">Planned Amount</TableHead>
                     <TableHead className="text-right">Actual Spent</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="text-right w-[100px]">Actions</TableHead>
+                    <TableHead className="text-right w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -693,7 +975,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                     const balance = parseFloat(item.amount) - actualSpent;
                     const categoryType = item.categoryType || "ad_hoc";
                     return (
-                      <TableRow key={item.id} className={getRowColor(item.color, categoryType)}>
+                      <TableRow key={item.id} className={`group ${getRowColor(item.color, categoryType)}`}>
                         <TableCell>
                           <div className="space-y-2">
                             <div className="font-medium text-gray-900">{item.description}</div>
@@ -728,11 +1010,33 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                         >
                           ₹{balance.toFixed(2)}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(item)}
+                              className="h-8 w-8 p-0 hover:bg-blue-100"
+                              title="Edit"
+                            >
+                              <Pencil className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(item.id)}
+                              className="h-8 w-8 p-0 hover:bg-red-100"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
                   <TableRow className="font-bold bg-gray-50">
-                    <TableCell colSpan={4}>Total</TableCell>
+                    <TableCell>Total</TableCell>
                     <TableCell className="text-right">₹{totalPlanned.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       ₹{budgetItems.reduce((sum, item) => sum + (item.actualSpent || 0), 0).toFixed(2)}

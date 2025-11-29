@@ -49,7 +49,33 @@ export async function getExpenseTemplates(search?: string) {
     ) as any;
   }
 
-  return await query.orderBy(expenseTemplates.description);
+  const templates = await query.orderBy(expenseTemplates.description);
+
+  // Check which templates are in use
+  const templatesWithUsage = await Promise.all(
+    templates.map(async (template) => {
+      const matchingBudgetItems = await db
+        .select()
+        .from(budgetItems)
+        .where(
+          and(
+            eq(budgetItems.householdId, householdId),
+            eq(budgetItems.description, template.description),
+            eq(budgetItems.amount, template.amount),
+            eq(budgetItems.categoryId, template.categoryId),
+            eq(budgetItems.allocatedToAccountId, template.accountId)
+          )
+        )
+        .limit(1);
+
+      return {
+        ...template,
+        inUse: matchingBudgetItems.length > 0,
+      };
+    })
+  );
+
+  return templatesWithUsage;
 }
 
 export async function createExpenseTemplate(data: z.infer<typeof templateSchema>) {
@@ -73,11 +99,98 @@ export async function createExpenseTemplate(data: z.infer<typeof templateSchema>
 export async function deleteExpenseTemplate(templateId: string) {
   const householdId = await getHouseholdId();
 
+  // Check if template exists and belongs to household
+  const [template] = await db
+    .select()
+    .from(expenseTemplates)
+    .where(and(eq(expenseTemplates.id, templateId), eq(expenseTemplates.householdId, householdId)))
+    .limit(1);
+
+  if (!template) {
+    return { error: "Template not found or unauthorized" };
+  }
+
+  // Check if template is being used in any budget items
+  // Note: Templates are not directly linked to budget items, but we can check by matching
+  // description, amount, categoryId, and accountId
+  const matchingBudgetItems = await db
+    .select()
+    .from(budgetItems)
+    .where(
+      and(
+        eq(budgetItems.householdId, householdId),
+        eq(budgetItems.description, template.description),
+        eq(budgetItems.amount, template.amount),
+        eq(budgetItems.categoryId, template.categoryId),
+        eq(budgetItems.allocatedToAccountId, template.accountId)
+      )
+    )
+    .limit(1);
+
+  if (matchingBudgetItems.length > 0) {
+    return { error: "Cannot delete template: It is being used in budget items" };
+  }
+
   await db
     .delete(expenseTemplates)
     .where(and(eq(expenseTemplates.id, templateId), eq(expenseTemplates.householdId, householdId)));
 
   return { success: true };
+}
+
+export async function updateExpenseTemplate(
+  templateId: string,
+  data: z.infer<typeof templateSchema>
+) {
+  try {
+    const householdId = await getHouseholdId();
+    const validated = templateSchema.parse(data);
+
+    // Check if template exists and belongs to household
+    const [template] = await db
+      .select()
+      .from(expenseTemplates)
+      .where(and(eq(expenseTemplates.id, templateId), eq(expenseTemplates.householdId, householdId)))
+      .limit(1);
+
+    if (!template) {
+      return { error: "Template not found or unauthorized" };
+    }
+
+    // Check if template is being used in any budget items
+    const matchingBudgetItems = await db
+      .select()
+      .from(budgetItems)
+      .where(
+        and(
+          eq(budgetItems.householdId, householdId),
+          eq(budgetItems.description, template.description),
+          eq(budgetItems.amount, template.amount),
+          eq(budgetItems.categoryId, template.categoryId),
+          eq(budgetItems.allocatedToAccountId, template.accountId)
+        )
+      )
+      .limit(1);
+
+    if (matchingBudgetItems.length > 0) {
+      return { error: "Cannot edit template: It is being used in budget items" };
+    }
+
+    await db
+      .update(expenseTemplates)
+      .set({
+        description: validated.description,
+        amount: validated.amount,
+        categoryId: validated.categoryId,
+        accountId: validated.accountId,
+      })
+      .where(eq(expenseTemplates.id, templateId));
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating template:", error);
+    return { error: error.message || "Failed to update template" };
+  }
 }
 
 export async function copyBudgetFromMonth(sourceMonth: string, targetMonth: string) {

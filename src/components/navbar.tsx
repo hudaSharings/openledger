@@ -13,8 +13,9 @@ export function Navbar() {
 
   const navItems = [
     { href: "/", label: "Dashboard" },
-    { href: "/transaction-log", label: "Transactions" },
     { href: "/budget", label: "Budget" },
+    { href: "/transaction-log", label: "Transactions" },
+    { href: "/templates", label: "Templates" },
     { href: "/settings", label: "Settings" },
   ];
 

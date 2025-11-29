@@ -83,32 +83,40 @@ export async function updateBudgetItem(
   budgetItemId: string,
   data: Omit<z.infer<typeof budgetItemSchema>, "monthYear">
 ) {
-  const householdId = await getHouseholdId();
-  const validated = budgetItemSchema.omit({ monthYear: true }).parse(data);
+  try {
+    const householdId = await getHouseholdId();
+    
+    // Create a schema without monthYear for validation
+    const updateSchema = budgetItemSchema.omit({ monthYear: true });
+    const validated = updateSchema.parse(data);
 
-  // Verify the budget item belongs to the household
-  const [existing] = await db
-    .select()
-    .from(budgetItems)
-    .where(and(eq(budgetItems.id, budgetItemId), eq(budgetItems.householdId, householdId)))
-    .limit(1);
+    // Verify the budget item belongs to the household
+    const [existing] = await db
+      .select()
+      .from(budgetItems)
+      .where(and(eq(budgetItems.id, budgetItemId), eq(budgetItems.householdId, householdId)))
+      .limit(1);
 
-  if (!existing) {
-    return { error: "Budget item not found or unauthorized" };
+    if (!existing) {
+      return { error: "Budget item not found or unauthorized" };
+    }
+
+    await db
+      .update(budgetItems)
+      .set({
+        description: validated.description,
+        amount: validated.amount,
+        categoryId: validated.categoryId,
+        allocatedToAccountId: validated.allocatedToAccountId,
+        color: validated.color || "blue",
+      })
+      .where(eq(budgetItems.id, budgetItemId));
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating budget item:", error);
+    return { error: error.message || "Failed to update budget item" };
   }
-
-  await db
-    .update(budgetItems)
-    .set({
-      description: validated.description,
-      amount: validated.amount,
-      categoryId: validated.categoryId,
-      allocatedToAccountId: validated.allocatedToAccountId,
-      color: validated.color || "blue",
-    })
-    .where(eq(budgetItems.id, budgetItemId));
-
-  return { success: true };
 }
 
 export async function deleteBudgetItem(budgetItemId: string) {

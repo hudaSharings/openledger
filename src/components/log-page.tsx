@@ -82,8 +82,11 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
     }
     if (open) {
       loadData();
+      // Reset date to current date when dialog opens
+      const today = new Date();
+      setValue("date", today.toISOString());
     }
-  }, [currentMonth, open]);
+  }, [currentMonth, open, setValue]);
 
   // Auto-fill when budget item is selected
   useEffect(() => {
@@ -148,8 +151,9 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
       setError(null);
       setSuccess(false);
     } else {
-      // When opening, ensure date is set to current date
-      setValue("date", currentDate.toISOString());
+      // When opening, ensure date is set to current date in correct format
+      const today = new Date();
+      setValue("date", today.toISOString());
     }
   };
 
@@ -221,11 +225,14 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
                 type="date"
                 {...register("date", {
                   setValueAs: (value) => {
-                    if (!value) return currentDate.toISOString();
+                    if (!value) {
+                      const today = new Date();
+                      return today.toISOString();
+                    }
                     return new Date(value).toISOString();
                   },
                 })}
-                defaultValue={currentDateString}
+                value={dateValue ? format(new Date(dateValue), "yyyy-MM-dd") : currentDateString}
                 className="h-10"
               />
               {errors.date && (
