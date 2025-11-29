@@ -6,8 +6,11 @@ import { DashboardChart } from "./dashboard-chart";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { Calendar, Plus } from "lucide-react";
+import { getServerSession } from "@/src/lib/get-session";
 
 export async function Dashboard({ monthYear }: { monthYear: string }) {
+  const session = await getServerSession();
+  const isAdmin = session?.user?.role === "admin";
   const data = await getDashboardData(monthYear);
 
   const chartData = data.categoryData.map((item) => ({
@@ -27,13 +30,15 @@ export async function Dashboard({ monthYear }: { monthYear: string }) {
           <p className="text-sm sm:text-base text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-          <Link href={`/budget/${monthYear}`} className="w-full sm:w-auto">
-            <Button variant="default" className="gap-2 w-full sm:w-auto">
-              <Plus className="h-4 w-4" />
-              <span className="hidden xs:inline">Budget Planning</span>
-              <span className="xs:hidden">Budget</span>
-            </Button>
-          </Link>
+          {isAdmin && (
+            <Link href={`/budget/${monthYear}`} className="w-full sm:w-auto">
+              <Button variant="default" className="gap-2 w-full sm:w-auto">
+                <Plus className="h-4 w-4" />
+                <span className="hidden xs:inline">Budget Planning</span>
+                <span className="xs:hidden">Budget</span>
+              </Button>
+            </Link>
+          )}
           <div className="w-full sm:w-auto">
             <ExportButton monthYear={monthYear} />
           </div>
