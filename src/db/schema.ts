@@ -9,7 +9,7 @@ export const categoryTypeEnum = pgEnum("category_type", ["mandatory", "periodic"
 export const households = pgTable("households", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
-  createdBy: uuid("created_by").notNull(),
+  createdBy: uuid("created_by"), // Nullable - will be set after user creation
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

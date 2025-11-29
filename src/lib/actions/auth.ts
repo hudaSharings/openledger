@@ -10,29 +10,30 @@ import { randomBytes } from "crypto";
 import { getServerSession } from "@/src/lib/get-session";
 
 export async function registerUser(data: z.infer<typeof registerSchema>) {
-  const validated = registerSchema.parse(data);
+  try {
+    const validated = registerSchema.parse(data);
 
-  // Check if user already exists
-  const existingUser = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, validated.email))
-    .limit(1);
+    // Check if user already exists
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, validated.email))
+      .limit(1);
 
-  if (existingUser.length > 0) {
-    return { error: "User with this email already exists" };
-  }
+    if (existingUser.length > 0) {
+      return { error: "User with this email already exists" };
+    }
 
-  const passwordHash = await bcrypt.hash(validated.password, 10);
+    const passwordHash = await bcrypt.hash(validated.password, 10);
 
-  // Create household and user in a transaction
-  const result = await db.transaction(async (tx) => {
-    // Create household
+    // Create household and user in a transaction
+    const result = await db.transaction(async (tx) => {
+    // Create household (createdBy will be set after user creation)
     const [household] = await tx
       .insert(households)
       .values({
         name: validated.householdName,
-        createdBy: "", // Will be updated after user creation
+        createdBy: null, // Will be updated after user creation
       })
       .returning();
 
@@ -66,9 +67,23 @@ export async function registerUser(data: z.infer<typeof registerSchema>) {
     ]);
 
     return { user, household };
-  });
+    });
 
-  return { success: true, userId: result.user.id };
+    return { success: true, userId: result.user.id };
+  } catch (error) {
+    console.error("Registration error:", error);
+    if (error instanceof z.ZodError) {
+      return { error: "Invalid form data. Please check your inputs." };
+    }
+    if (error instanceof Error) {
+      // Check for database constraint errors
+      if (error.message.includes("not null") || error.message.includes("constraint")) {
+        return { error: "Database error. Please ensure all required fields are provided." };
+      }
+      return { error: error.message || "An error occurred during registration" };
+    }
+    return { error: "An unexpected error occurred. Please try again." };
+  }
 }
 
 export async function createInviteToken(householdId: string, email: string) {

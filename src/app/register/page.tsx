@@ -84,7 +84,11 @@ export default function RegisterPage() {
                 <p className="text-sm text-red-500">{errors.householdName.message as string}</p>
               )}
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && (
+              <div className="rounded-md bg-red-50 p-3">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Creating..." : "Create Account"}
             </Button>
