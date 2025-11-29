@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { registerSchema } from "@/src/lib/validations";
 import { registerUser } from "@/src/lib/actions/auth";
 import { Button } from "@/src/components/ui/button";
@@ -12,6 +13,8 @@ import { Label } from "@/src/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import Link from "next/link";
 
+type RegisterFormData = z.infer<typeof registerSchema>;
+
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -19,15 +22,11 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm({
+  } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
 
-  const onSubmit = async (data: {
-    email: string;
-    password: string;
-    householdName: string;
-  }) => {
+  const onSubmit = async (data: RegisterFormData) => {
     setError(null);
     try {
       const result = await registerUser(data);

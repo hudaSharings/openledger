@@ -24,7 +24,7 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  const onSubmit = async (data: { email: string; password: string }) => {
+  const onSubmit = async (data: z.infer<typeof loginSchema>) => {
     setError(null);
     try {
       const result = await signIn("credentials", {
