@@ -15,8 +15,10 @@ import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const [error, setError] = useState<string | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  
   const {
     register,
     handleSubmit,
@@ -27,14 +29,16 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (status === "authenticated" && session) {
+    if (status === "authenticated" && session && !isRedirecting) {
+      setIsRedirecting(true);
       router.push("/");
-      router.refresh();
     }
-  }, [session, status, router]);
+  }, [status, session, router, isRedirecting]);
 
   const onSubmit = async (data: z.infer<typeof loginSchema>) => {
     setError(null);
+    setIsRedirecting(false);
+    
     try {
       const result = await signIn("credentials", {
         email: data.email,
@@ -44,16 +48,23 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError("Invalid email or password");
-      } else if (result?.ok) {
-        // Wait for cookie to be set, especially important in production
-        // Production environments (HTTPS) may need more time for cookie propagation
-        const delay = typeof window !== "undefined" && window.location.protocol === "https:" ? 500 : 200;
+        return;
+      }
+
+      if (result?.ok) {
+        // Force session refresh
+        await update();
         
-        setTimeout(() => {
-          // Use window.location.replace for a hard redirect
-          // This ensures the session cookie is properly recognized by the browser
+        // Wait for cookie to be set and session to be available
+        // Use a longer delay to ensure middleware can read the cookie
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Do a hard redirect with full page reload
+        // This ensures the cookie is sent with the request
+        if (!isRedirecting) {
+          setIsRedirecting(true);
           window.location.replace("/");
-        }, delay);
+        }
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
@@ -89,6 +100,8 @@ export default function LoginPage() {
                 type="email"
                 {...register("email")}
                 placeholder="you@example.com"
+                autoComplete="email"
+                disabled={isSubmitting}
               />
               {errors.email && (
                 <p className="text-sm text-red-500">{errors.email.message as string}</p>
@@ -101,13 +114,23 @@ export default function LoginPage() {
                 type="password"
                 {...register("password")}
                 placeholder="••••••••"
+                autoComplete="current-password"
+                disabled={isSubmitting}
               />
               {errors.password && (
                 <p className="text-sm text-red-500">{errors.password.message as string}</p>
               )}
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {error && (
+              <div className="rounded-md bg-red-50 p-3">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isSubmitting}
+            >
               {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>
           </form>
@@ -117,6 +140,12 @@ export default function LoginPage() {
               Sign up
             </Link>
           </p>
+          <div className="mt-4 rounded-md bg-blue-50 p-3">
+            <p className="text-xs text-blue-800 font-medium">Demo Credentials:</p>
+            <p className="text-xs text-blue-700 mt-1">
+              Admin: <code className="bg-blue-100 px-1 rounded">admin@demo.com</code> / <code className="bg-blue-100 px-1 rounded">demo123</code>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

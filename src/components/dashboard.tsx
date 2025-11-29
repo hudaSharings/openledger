@@ -21,19 +21,22 @@ export async function Dashboard({ monthYear }: { monthYear: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href={`/budget/${monthYear}`}>
-            <Button variant="default" className="gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <Link href={`/budget/${monthYear}`} className="w-full sm:w-auto">
+            <Button variant="default" className="gap-2 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
-              Budget Planning
+              <span className="hidden xs:inline">Budget Planning</span>
+              <span className="xs:hidden">Budget</span>
             </Button>
           </Link>
-          <ExportButton monthYear={monthYear} />
+          <div className="w-full sm:w-auto">
+            <ExportButton monthYear={monthYear} />
+          </div>
         </div>
       </div>
 
