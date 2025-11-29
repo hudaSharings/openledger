@@ -10,6 +10,11 @@ export default async function TemplatesPageRoute() {
     redirect("/login");
   }
 
+  // Only admins can access templates
+  if (session.user.role !== "admin") {
+    redirect("/");
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />

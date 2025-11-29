@@ -141,7 +141,7 @@ export function TemplatesPage() {
         // Update existing template
         const result = await updateExpenseTemplate(editingTemplate.id, data);
         if (result.error) {
-          setError(result.error);
+          setError(typeof result.error === "string" ? result.error : "An error occurred");
         } else {
           setSuccess(true);
           // Reload templates
@@ -158,7 +158,7 @@ export function TemplatesPage() {
       } else {
         const result = await createExpenseTemplate(data);
         if (result.error) {
-          setError(result.error);
+          setError(typeof result.error === "string" ? result.error : "An error occurred");
         } else {
           setSuccess(true);
           // Reload templates

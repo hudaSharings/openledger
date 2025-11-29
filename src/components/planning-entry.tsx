@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { budgetItemSchema } from "@/src/lib/validations";
 import { createBudgetItem, updateBudgetItem, deleteBudgetItem, getCategories, getPaymentAccounts, getBudgetItems } from "@/src/lib/actions/financial";
 import { getExpenseTemplates, createExpenseTemplate, copyBudgetFromMonth } from "@/src/lib/actions/templates";
+import { useSession } from "next-auth/react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -13,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { format, subMonths, addMonths, parse } from "date-fns";
-import { Trash2, Plus, Copy, Search, X, Save, ChevronLeft, ChevronRight, RotateCcw, Pencil } from "lucide-react";
+import { Trash2, Plus, Copy, Search, X, Save, ChevronLeft, ChevronRight, RotateCcw, Pencil, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -49,6 +50,8 @@ interface ExpenseTemplate {
 }
 
 export function PlanningEntry({ monthYear }: { monthYear: string }) {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin";
   const router = useRouter();
   const [categories, setCategories] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
@@ -172,7 +175,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
       }
 
       if (result.error) {
-        setError(result.error);
+        setError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         setSuccess(true);
         reset({
@@ -243,7 +246,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
     try {
       const result = await copyBudgetFromMonth(copyFromMonth, monthYear);
       if (result.error) {
-        setError(result.error);
+        setError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         setSuccess(true);
         setCopyDialogOpen(false);
@@ -330,7 +333,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
     try {
       const result = await deleteBudgetItem(itemId);
       if (result.error) {
-        setError(result.error);
+        setError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         // Reload budget items
         const items = await getBudgetItems(monthYear);
@@ -439,13 +442,20 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
           )}
         </div>
         <div className="flex gap-2">
-          <Dialog open={addItemDialogOpen} onOpenChange={handleDialogOpenChange}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 shadow-md">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Budget Item
-              </Button>
-            </DialogTrigger>
+          {!isAdmin && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <Lock className="h-4 w-4 text-yellow-600" />
+              <span className="text-sm text-yellow-800">View only - Admin access required to edit</span>
+            </div>
+          )}
+          {isAdmin && (
+            <Dialog open={addItemDialogOpen} onOpenChange={handleDialogOpenChange}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 hover:bg-blue-700 shadow-md">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Budget Item
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-xl">Add Budget Item</DialogTitle>
@@ -662,7 +672,9 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
               </form>
             </DialogContent>
           </Dialog>
-          <Dialog open={editDialogOpen} onOpenChange={handleEditDialogOpenChange}>
+          )}
+          {isAdmin && (
+            <Dialog open={editDialogOpen} onOpenChange={handleEditDialogOpenChange}>
             <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-xl">Edit Budget Item</DialogTitle>
@@ -879,7 +891,9 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
               </form>
             </DialogContent>
           </Dialog>
-          <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+          )}
+          {isAdmin && (
+            <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <Copy className="h-4 w-4" />
@@ -915,6 +929,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -1011,26 +1026,30 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                           ₹{balance.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(item)}
-                              className="h-8 w-8 p-0 hover:bg-blue-100"
-                              title="Edit"
-                            >
-                              <Pencil className="h-4 w-4 text-blue-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(item.id)}
-                              className="h-8 w-8 p-0 hover:bg-red-100"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
+                          {isAdmin ? (
+                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(item)}
+                                className="h-8 w-8 p-0 hover:bg-blue-100"
+                                title="Edit"
+                              >
+                                <Pencil className="h-4 w-4 text-blue-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(item.id)}
+                                className="h-8 w-8 p-0 hover:bg-red-100"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Lock className="h-4 w-4 text-gray-400 mx-auto" />
+                          )}
                         </TableCell>
                       </TableRow>
                     );

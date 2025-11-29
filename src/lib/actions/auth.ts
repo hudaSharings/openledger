@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { registerSchema, inviteSchema } from "@/src/lib/validations";
 import { z } from "zod";
 import { randomBytes } from "crypto";
+import { getServerSession } from "@/src/lib/get-session";
 
 export async function registerUser(data: z.infer<typeof registerSchema>) {
   const validated = registerSchema.parse(data);
@@ -71,6 +72,16 @@ export async function registerUser(data: z.infer<typeof registerSchema>) {
 }
 
 export async function createInviteToken(householdId: string, email: string) {
+  // Check if user is admin
+  const session = await getServerSession();
+  if (!session?.user || session.user.role !== "admin") {
+    return { error: "Unauthorized: Only admins can create invites" };
+  }
+
+  if (session.user.householdId !== householdId) {
+    return { error: "Unauthorized: Cannot invite to different household" };
+  }
+
   const validated = inviteSchema.parse({ email });
 
   // Check if user already exists
@@ -181,6 +192,53 @@ export async function acceptInvite(token: string, password: string) {
       .set({ used: true })
       .where(eq(inviteTokens.token, token));
   });
+
+  return { success: true };
+}
+
+export async function getHouseholdMembers() {
+  const session = await getServerSession();
+  if (!session?.user?.householdId) {
+    throw new Error("Unauthorized");
+  }
+
+  const members = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.householdId, session.user.householdId))
+    .orderBy(users.createdAt);
+
+  return members;
+}
+
+export async function updateUserRole(userId: string, newRole: "admin" | "member") {
+  const session = await getServerSession();
+  if (!session?.user?.householdId || session.user.role !== "admin") {
+    return { error: "Unauthorized: Only admins can update roles" };
+  }
+
+  // Prevent admin from removing their own admin role
+  if (userId === session.user.id && newRole === "member") {
+    return { error: "You cannot remove your own admin role" };
+  }
+
+  // Verify user belongs to same household
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.householdId, session.user.householdId)))
+    .limit(1);
+
+  if (!user) {
+    return { error: "User not found or unauthorized" };
+  }
+
+  await db.update(users).set({ role: newRole }).where(eq(users.id, userId));
 
   return { success: true };
 }

@@ -11,13 +11,15 @@ export function Navbar() {
 
   if (!session) return null;
 
+  const isAdmin = session.user.role === "admin";
+
   const navItems = [
-    { href: "/", label: "Dashboard" },
-    { href: "/budget", label: "Budget" },
-    { href: "/transaction-log", label: "Transactions" },
-    { href: "/templates", label: "Templates" },
-    { href: "/settings", label: "Settings" },
-  ];
+    { href: "/", label: "Dashboard", adminOnly: false },
+    { href: "/budget", label: "Budget", adminOnly: true },
+    { href: "/transaction-log", label: "Transactions", adminOnly: false },
+    { href: "/templates", label: "Templates", adminOnly: true },
+    { href: "/settings", label: "Settings", adminOnly: true },
+  ].filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <nav className="border-b bg-white shadow-sm">

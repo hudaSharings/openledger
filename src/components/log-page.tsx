@@ -108,7 +108,7 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
     try {
       const result = await createTransaction(data);
       if ("error" in result) {
-        setError(result.error);
+        setError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         setSuccess(true);
         reset({

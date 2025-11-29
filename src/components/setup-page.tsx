@@ -65,7 +65,7 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     try {
       const result = await createIncome(data);
       if ("error" in result) {
-        setError(result.error);
+        setError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         setSuccess(true);
       }

@@ -14,6 +14,11 @@ export default async function BudgetMonthPage({
     redirect("/login");
   }
 
+  // Only admins can access budget pages
+  if (session.user.role !== "admin") {
+    redirect("/");
+  }
+
   const { month } = await params;
 
   return (
