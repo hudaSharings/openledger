@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { inviteSchema, categorySchema } from "@/src/lib/validations";
 import { createInviteToken } from "@/src/lib/actions/auth";
 import { createCategory, getCategories } from "@/src/lib/actions/financial";
@@ -33,7 +34,7 @@ export function SettingsPage() {
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm({
+  } = useForm<z.infer<typeof inviteSchema>>({
     resolver: zodResolver(inviteSchema),
   });
 
@@ -44,7 +45,7 @@ export function SettingsPage() {
     watch: watchCategory,
     formState: { errors: categoryErrors, isSubmitting: isSubmittingCategory },
     reset: resetCategory,
-  } = useForm({
+  } = useForm<z.infer<typeof categorySchema>>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
       name: "",
@@ -62,7 +63,7 @@ export function SettingsPage() {
     loadCategories();
   }, []);
 
-  const onSubmit = async (data: { email: string }) => {
+  const onSubmit = async (data: z.infer<typeof inviteSchema>) => {
     setError(null);
     setSuccess(null);
     setInviteLink(null);
@@ -102,7 +103,7 @@ export function SettingsPage() {
     try {
       const result = await createCategory(data.name, data.type);
       if ("error" in result) {
-        setCategoryError(result.error);
+        setCategoryError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         setCategorySuccess(true);
         resetCategory();

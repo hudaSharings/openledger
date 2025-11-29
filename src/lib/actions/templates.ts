@@ -24,7 +24,13 @@ async function getHouseholdId() {
 export async function getExpenseTemplates(search?: string) {
   const householdId = await getHouseholdId();
 
-  let query = db
+  const baseConditions = [eq(expenseTemplates.householdId, householdId)];
+  
+  if (search) {
+    baseConditions.push(like(expenseTemplates.description, `%${search}%`));
+  }
+
+  const templates = await db
     .select({
       id: expenseTemplates.id,
       description: expenseTemplates.description,
@@ -38,18 +44,8 @@ export async function getExpenseTemplates(search?: string) {
     .from(expenseTemplates)
     .innerJoin(categories, eq(expenseTemplates.categoryId, categories.id))
     .innerJoin(paymentAccounts, eq(expenseTemplates.accountId, paymentAccounts.id))
-    .where(eq(expenseTemplates.householdId, householdId));
-
-  if (search) {
-    query = query.where(
-      and(
-        eq(expenseTemplates.householdId, householdId),
-        like(expenseTemplates.description, `%${search}%`)
-      )
-    ) as any;
-  }
-
-  const templates = await query.orderBy(expenseTemplates.description);
+    .where(and(...baseConditions))
+    .orderBy(expenseTemplates.description);
 
   // Check which templates are in use
   const templatesWithUsage = await Promise.all(

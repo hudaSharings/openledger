@@ -168,15 +168,15 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
       if (editingItem) {
         // Update existing item - remove monthYear from data
         const { monthYear: _, ...updateData } = data;
-        result = await updateBudgetItem(editingItem.id, updateData);
+        result = await updateBudgetItem(editingItem!.id, updateData);
       } else {
         // Create new item
         result = await createBudgetItem(data);
       }
 
-      if (result.error) {
+      if (result && "error" in result) {
         setError(typeof result.error === "string" ? result.error : "An error occurred");
-      } else {
+      } else if (result && result.success) {
         setSuccess(true);
         reset({
           monthYear,
@@ -245,9 +245,9 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
 
     try {
       const result = await copyBudgetFromMonth(copyFromMonth, monthYear);
-      if (result.error) {
+      if (result && "error" in result) {
         setError(typeof result.error === "string" ? result.error : "An error occurred");
-      } else {
+      } else if (result && result.success) {
         setSuccess(true);
         setCopyDialogOpen(false);
         setCopyFromMonth("");
@@ -310,11 +310,13 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
         setCategories(cats);
         setAccounts(accs);
         // Pre-populate form with editing item data
-        setValue("description", editingItem.description);
-        setValue("amount", editingItem.amount);
-        setValue("categoryId", editingItem.categoryId);
-        setValue("allocatedToAccountId", editingItem.accountId);
-        setValue("color", editingItem.color || "blue");
+        if (editingItem) {
+          setValue("description", editingItem.description);
+          setValue("amount", editingItem.amount);
+          setValue("categoryId", editingItem.categoryId);
+          setValue("allocatedToAccountId", editingItem.accountId);
+          setValue("color", editingItem.color || "blue");
+        }
       }
       loadData();
     }
@@ -332,9 +334,9 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
 
     try {
       const result = await deleteBudgetItem(itemId);
-      if (result.error) {
+      if (result && "error" in result) {
         setError(typeof result.error === "string" ? result.error : "An error occurred");
-      } else {
+      } else if (result && result.success) {
         // Reload budget items
         const items = await getBudgetItems(monthYear);
         setBudgetItems(items);

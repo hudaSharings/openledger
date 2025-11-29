@@ -157,7 +157,7 @@ export function TemplatesPage() {
         }
       } else {
         const result = await createExpenseTemplate(data);
-        if (result.error) {
+        if ("error" in result) {
           setError(typeof result.error === "string" ? result.error : "An error occurred");
         } else {
           setSuccess(true);

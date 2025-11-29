@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { transactionSchema } from "@/src/lib/validations";
 import { createTransaction, getCategories, getPaymentAccounts, getBudgetItems } from "@/src/lib/actions/financial";
+import { z } from "zod";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -50,7 +51,7 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
     watch,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm({
+  } = useForm<z.infer<typeof transactionSchema>>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       date: currentDate.toISOString(),
@@ -102,14 +103,12 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
     }
   }, [budgetItemId, budgetItems, setValue]);
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: z.infer<typeof transactionSchema>) => {
     setError(null);
     setSuccess(false);
     try {
       const result = await createTransaction(data);
-      if ("error" in result) {
-        setError(typeof result.error === "string" ? result.error : "An error occurred");
-      } else {
+      if (result && result.success) {
         setSuccess(true);
         reset({
           date: currentDate.toISOString(),
@@ -130,8 +129,8 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
           onTransactionAdded();
         }
       }
-    } catch (err) {
-      setError("An error occurred. Please try again.");
+    } catch (err: any) {
+      setError(err.message || "An error occurred. Please try again.");
     }
   };
 
@@ -190,7 +189,7 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
                   setValue("categoryId", "");
                   setValue("paidFromAccountId", "");
                 } else {
-                  setValue("budgetItemId", value as string | undefined);
+                  setValue("budgetItemId", value || undefined, { shouldValidate: false });
                 }
               }}
             >

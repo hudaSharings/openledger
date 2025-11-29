@@ -1,11 +1,11 @@
-import type { NextAuthOptions } from "next-auth";
+import type { NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/src/db";
 import { users } from "@/src/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
-export const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthConfig = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -21,7 +21,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           // Normalize email to lowercase for comparison
-          const email = credentials.email.toLowerCase().trim();
+          const email = (credentials.email as string).toLowerCase().trim();
 
           // Retry logic for database connection
           let user;
@@ -55,7 +55,7 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          const isValid = await bcrypt.compare(credentials.password, user[0].passwordHash);
+          const isValid = await bcrypt.compare(credentials.password as string, user[0].passwordHash);
 
           if (!isValid) {
             console.error(`Invalid password for user: ${email}`);
