@@ -45,10 +45,15 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Invalid email or password");
       } else if (result?.ok) {
-        // Wait a moment for session to be established, then redirect
+        // Wait for cookie to be set, especially important in production
+        // Production environments (HTTPS) may need more time for cookie propagation
+        const delay = typeof window !== "undefined" && window.location.protocol === "https:" ? 500 : 200;
+        
         setTimeout(() => {
-          window.location.href = "/";
-        }, 100);
+          // Use window.location.replace for a hard redirect
+          // This ensures the session cookie is properly recognized by the browser
+          window.location.replace("/");
+        }, delay);
       }
     } catch (err) {
       setError("An error occurred. Please try again.");

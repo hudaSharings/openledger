@@ -20,7 +20,7 @@ export default withPWA({
   dest: "public",
   register: true,
   skipWaiting: true,
-  disable: !isProduction, // Only enable in production to avoid dev build issues
+  disable: process.env.NODE_ENV === "development", // Disable only in development
   buildExcludes: [/middleware-manifest\.json$/],
   publicExcludes: ["!noprecache/**/*"],
   runtimeCaching: [

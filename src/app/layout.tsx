@@ -24,8 +24,16 @@ export const metadata: Metadata = {
     title: "OpenLedger",
   },
   icons: {
-    icon: "/icon-192.png",
-    apple: "/icon-192.png",
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 
@@ -35,6 +43,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -44,6 +53,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#3b82f6" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="OpenLedger" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

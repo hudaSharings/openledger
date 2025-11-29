@@ -23,6 +23,7 @@
     }
   ],
   "categories": ["finance", "productivity"],
-  "screenshots": []
+  "screenshots": [],
+  "prefer_related_applications": false
 }
 
