@@ -13,11 +13,14 @@ export async function registerUser(data: z.infer<typeof registerSchema>) {
   try {
     const validated = registerSchema.parse(data);
 
+    // Normalize email to lowercase
+    const normalizedEmail = validated.email.toLowerCase().trim();
+
     // Check if user already exists
     const existingUser = await db
       .select()
       .from(users)
-      .where(eq(users.email, validated.email))
+      .where(eq(users.email, normalizedEmail))
       .limit(1);
 
     if (existingUser.length > 0) {
@@ -28,60 +31,96 @@ export async function registerUser(data: z.infer<typeof registerSchema>) {
 
     // Create household and user in a transaction
     const result = await db.transaction(async (tx) => {
-    // Create household (createdBy will be set after user creation)
-    const [household] = await tx
-      .insert(households)
-      .values({
-        name: validated.householdName,
-        createdBy: null, // Will be updated after user creation
-      })
-      .returning();
+      // Create household (createdBy will be set after user creation)
+      const [household] = await tx
+        .insert(households)
+        .values({
+          name: validated.householdName.trim(),
+          createdBy: null, // Will be updated after user creation
+        })
+        .returning();
 
-    // Create user
-    const [user] = await tx
-      .insert(users)
-      .values({
-        email: validated.email,
-        passwordHash,
-        householdId: household.id,
-        role: "admin",
-      })
-      .returning();
+      if (!household) {
+        throw new Error("Failed to create household");
+      }
 
-    // Update household createdBy
-    await tx
-      .update(households)
-      .set({ createdBy: user.id })
-      .where(eq(households.id, household.id));
+      // Create user
+      const [user] = await tx
+        .insert(users)
+        .values({
+          email: normalizedEmail,
+          passwordHash,
+          householdId: household.id,
+          role: "admin",
+        })
+        .returning();
 
-    // Create default payment accounts
-    await tx.insert(paymentAccounts).values([
-      {
-        householdId: household.id,
-        name: "Primary Account",
-      },
-      {
-        householdId: household.id,
-        name: "Shared Allocation",
-      },
-    ]);
+      if (!user) {
+        throw new Error("Failed to create user");
+      }
 
-    return { user, household };
+      // Update household createdBy
+      await tx
+        .update(households)
+        .set({ createdBy: user.id })
+        .where(eq(households.id, household.id));
+
+      // Create default payment accounts
+      await tx.insert(paymentAccounts).values([
+        {
+          householdId: household.id,
+          name: "Primary Account",
+        },
+        {
+          householdId: household.id,
+          name: "Shared Allocation",
+        },
+      ]);
+
+      return { user, household };
     });
 
     return { success: true, userId: result.user.id };
   } catch (error) {
     console.error("Registration error:", error);
-    if (error instanceof z.ZodError) {
-      return { error: "Invalid form data. Please check your inputs." };
-    }
+    
+    // Log full error details for debugging
     if (error instanceof Error) {
-      // Check for database constraint errors
-      if (error.message.includes("not null") || error.message.includes("constraint")) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      
+      // Check for specific database errors
+      const errorMessage = error.message.toLowerCase();
+      
+      if (error instanceof z.ZodError) {
+        return { error: "Invalid form data. Please check your inputs." };
+      }
+      
+      // Foreign key constraint errors
+      if (errorMessage.includes("foreign key") || errorMessage.includes("violates foreign key constraint")) {
+        return { error: "Database constraint error. Please try again or contact support." };
+      }
+      
+      // Unique constraint errors
+      if (errorMessage.includes("unique") || errorMessage.includes("duplicate key")) {
+        return { error: "A user with this email already exists." };
+      }
+      
+      // Not null constraint errors
+      if (errorMessage.includes("not null") || errorMessage.includes("null value")) {
         return { error: "Database error. Please ensure all required fields are provided." };
       }
+      
+      // Connection errors
+      if (errorMessage.includes("connection") || errorMessage.includes("timeout") || errorMessage.includes("connect")) {
+        return { error: "Database connection error. Please try again." };
+      }
+      
+      // Return the actual error message for debugging (in production, you might want to hide this)
       return { error: error.message || "An error occurred during registration" };
     }
+    
     return { error: "An unexpected error occurred. Please try again." };
   }
 }
