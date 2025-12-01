@@ -46,6 +46,8 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
   const allocations = watch("allocations");
 
   useEffect(() => {
+    let isMounted = true;
+    
     async function loadData() {
       setLoading(true);
       try {
@@ -53,6 +55,9 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
           getPaymentAccounts(),
           getIncomeForMonth(monthYear),
         ]);
+        
+        if (!isMounted) return;
+        
         setAccounts(accs);
 
         if (existingIncome) {
@@ -78,10 +83,16 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
       } catch (err) {
         console.error("Error loading data:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
     loadData();
+    
+    return () => {
+      isMounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthYear]);
 
@@ -104,14 +115,22 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
         setError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         setSuccess(true);
-        setExistingIncomeId(result.incomeId || null);
-        // Reload data to reflect changes
-        setTimeout(async () => {
-          const existingIncome = await getIncomeForMonth(monthYear);
-          if (existingIncome) {
-            setExistingIncomeId(existingIncome.income.id);
-          }
-        }, 500);
+        // Reload data to reflect changes and update form
+        const existingIncome = await getIncomeForMonth(monthYear);
+        if (existingIncome) {
+          setExistingIncomeId(existingIncome.income.id);
+          // Reset form with updated data
+          reset({
+            monthYear,
+            totalAmount: existingIncome.income.totalAmount,
+            allocations: existingIncome.allocations.map((alloc) => ({
+              accountId: alloc.accountId,
+              amount: alloc.allocatedAmount,
+            })),
+          });
+        } else {
+          setExistingIncomeId(result.incomeId || null);
+        }
       }
     } catch (err) {
       setError("An error occurred. Please try again.");

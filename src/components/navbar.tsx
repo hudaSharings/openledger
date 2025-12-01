@@ -35,7 +35,7 @@ export function Navbar() {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
-    { href: "/budget", label: "Budget", icon: Wallet, adminOnly: true },
+    { href: "/budget", label: "Budget", icon: Wallet, adminOnly: false },
     { href: "/transaction-log", label: "Transactions", icon: Receipt, adminOnly: false },
     { href: "/templates", label: "Templates", icon: FileText, adminOnly: true },
     { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
@@ -70,19 +70,23 @@ export function Navbar() {
             
             {/* Desktop Navigation */}
             <div className="hidden md:flex gap-6">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`text-sm font-medium transition-colors ${
-                    pathname === item.href
-                      ? "text-blue-600 border-b-2 border-blue-600 pb-1"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                // Check if current path matches or starts with the href (for nested routes)
+                const isActive = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`text-sm font-medium transition-colors ${
+                      isActive
+                        ? "text-blue-600 border-b-2 border-blue-600 pb-1"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
               {incomeNavItem && (
                 <Link
                   href={incomeNavItem.href}
@@ -151,13 +155,15 @@ export function Navbar() {
               <nav className="flex-1 overflow-y-auto p-3 space-y-1">
                 {navItems.map((item) => {
                   const Icon = item.icon;
+                  // Check if current path matches or starts with the href (for nested routes)
+                  const isActive = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors ${
-                        pathname === item.href
+                        isActive
                           ? "text-blue-600 bg-blue-50"
                           : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
                       }`}

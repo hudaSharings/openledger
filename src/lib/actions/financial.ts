@@ -9,7 +9,7 @@ import {
   categories,
   paymentAccounts,
 } from "@/src/db/schema";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { incomeSchema, budgetItemSchema, transactionSchema } from "@/src/lib/validations";
 import { z } from "zod";
 import { getServerSession } from "@/src/lib/get-session";
@@ -84,8 +84,8 @@ export async function getIncomeForMonth(monthYear: string) {
       allocatedAmount: fundAllocations.allocatedAmount,
     })
     .from(fundAllocations)
-    .innerJoin(incomeEntries, eq(fundAllocations.incomeId, income.id))
-    .innerJoin(paymentAccounts, eq(fundAllocations.accountId, paymentAccounts.id));
+    .innerJoin(paymentAccounts, eq(fundAllocations.accountId, paymentAccounts.id))
+    .where(eq(fundAllocations.incomeId, income.id));
 
   return {
     income,
@@ -248,8 +248,8 @@ export async function createTransaction(data: z.infer<typeof transactionSchema>)
 export async function getDashboardData(monthYear: string) {
   const householdId = await getHouseholdId();
 
-  // Get income for the month
-  const [income] = await db
+  // Get all income entries for the month (should be only one, but handle multiple)
+  const incomeEntriesList = await db
     .select()
     .from(incomeEntries)
     .where(
@@ -257,11 +257,19 @@ export async function getDashboardData(monthYear: string) {
         eq(incomeEntries.householdId, householdId),
         eq(incomeEntries.monthYear, monthYear)
       )
-    )
-    .limit(1);
+    );
 
-  // Get fund allocations
-  const allocations = income
+  // Sum all income entries for the month (in case there are duplicates)
+  const totalIncome = incomeEntriesList.reduce(
+    (sum, entry) => sum + parseFloat(entry.totalAmount),
+    0
+  );
+
+  // Get all income IDs for the month
+  const incomeIds = incomeEntriesList.map((entry) => entry.id);
+
+  // Get fund allocations for all income entries of this month
+  const allocations = incomeIds.length > 0
     ? await db
         .select({
           accountId: paymentAccounts.id,
@@ -269,8 +277,8 @@ export async function getDashboardData(monthYear: string) {
           allocatedAmount: fundAllocations.allocatedAmount,
         })
         .from(fundAllocations)
-        .innerJoin(incomeEntries, eq(fundAllocations.incomeId, income.id))
         .innerJoin(paymentAccounts, eq(fundAllocations.accountId, paymentAccounts.id))
+        .where(inArray(fundAllocations.incomeId, incomeIds))
     : [];
 
   // Get budget items
@@ -344,7 +352,24 @@ export async function getDashboardData(monthYear: string) {
   const totalActual = totalPlannedActual + totalUnplannedActual;
 
   // Calculate remaining balance per account
-  const accountBalances = allocations.map((alloc) => {
+  // Group allocations by accountId to handle any duplicates and sum them
+  const allocationsByAccount = allocations.reduce(
+    (acc, alloc) => {
+      const accountId = alloc.accountId;
+      if (!acc[accountId]) {
+        acc[accountId] = {
+          accountId: alloc.accountId,
+          accountName: alloc.accountName,
+          allocated: 0,
+        };
+      }
+      acc[accountId].allocated += parseFloat(alloc.allocatedAmount);
+      return acc;
+    },
+    {} as Record<string, { accountId: string; accountName: string; allocated: number }>
+  );
+
+  const accountBalances = Object.values(allocationsByAccount).map((alloc) => {
     const accountTransactions = transactionsList.filter(
       (t) => t.paidFromAccountId === alloc.accountId
     );
@@ -355,9 +380,9 @@ export async function getDashboardData(monthYear: string) {
     return {
       accountId: alloc.accountId,
       accountName: alloc.accountName,
-      allocated: parseFloat(alloc.allocatedAmount),
+      allocated: alloc.allocated,
       spent,
-      remaining: parseFloat(alloc.allocatedAmount) - spent,
+      remaining: alloc.allocated - spent,
     };
   });
 
@@ -395,7 +420,7 @@ export async function getDashboardData(monthYear: string) {
   });
 
   return {
-    income: income ? parseFloat(income.totalAmount) : 0,
+    income: totalIncome,
     totalPlanned,
     totalActual,
     totalPlannedActual,
