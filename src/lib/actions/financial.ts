@@ -59,6 +59,92 @@ export async function createIncome(data: z.infer<typeof incomeSchema>) {
   return { success: true, incomeId: result.id };
 }
 
+export async function getIncomeForMonth(monthYear: string) {
+  const householdId = await getHouseholdId();
+
+  const [income] = await db
+    .select()
+    .from(incomeEntries)
+    .where(
+      and(
+        eq(incomeEntries.householdId, householdId),
+        eq(incomeEntries.monthYear, monthYear)
+      )
+    )
+    .limit(1);
+
+  if (!income) {
+    return null;
+  }
+
+  const allocations = await db
+    .select({
+      accountId: paymentAccounts.id,
+      accountName: paymentAccounts.name,
+      allocatedAmount: fundAllocations.allocatedAmount,
+    })
+    .from(fundAllocations)
+    .innerJoin(incomeEntries, eq(fundAllocations.incomeId, income.id))
+    .innerJoin(paymentAccounts, eq(fundAllocations.accountId, paymentAccounts.id));
+
+  return {
+    income,
+    allocations,
+  };
+}
+
+export async function updateIncome(incomeId: string, data: z.infer<typeof incomeSchema>) {
+  const householdId = await getHouseholdId();
+  const validated = incomeSchema.parse(data);
+
+  const totalAllocated = validated.allocations.reduce(
+    (sum, alloc) => sum + parseFloat(alloc.amount),
+    0
+  );
+
+  if (Math.abs(totalAllocated - parseFloat(validated.totalAmount)) > 0.01) {
+    return { error: "Total allocations must equal total income" };
+  }
+
+  // Verify the income belongs to the household
+  const [existing] = await db
+    .select()
+    .from(incomeEntries)
+    .where(and(eq(incomeEntries.id, incomeId), eq(incomeEntries.householdId, householdId)))
+    .limit(1);
+
+  if (!existing) {
+    return { error: "Income entry not found" };
+  }
+
+  const result = await db.transaction(async (tx) => {
+    // Update income
+    const [income] = await tx
+      .update(incomeEntries)
+      .set({
+        totalAmount: validated.totalAmount,
+      })
+      .where(eq(incomeEntries.id, incomeId))
+      .returning();
+
+    // Delete old allocations
+    await tx.delete(fundAllocations).where(eq(fundAllocations.incomeId, incomeId));
+
+    // Insert new allocations
+    await tx.insert(fundAllocations).values(
+      validated.allocations.map((alloc) => ({
+        incomeId: income.id,
+        accountId: alloc.accountId,
+        allocatedAmount: alloc.amount,
+      }))
+    );
+
+    return income;
+  });
+
+  return { success: true, incomeId: result.id };
+}
+
 export async function createBudgetItem(data: z.infer<typeof budgetItemSchema>) {
   const householdId = await getHouseholdId();
   const validated = budgetItemSchema.parse(data);

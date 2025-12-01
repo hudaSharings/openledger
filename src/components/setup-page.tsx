@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { incomeSchema } from "@/src/lib/validations";
-import { createIncome, getPaymentAccounts } from "@/src/lib/actions/financial";
+import { createIncome, getPaymentAccounts, getIncomeForMonth, updateIncome } from "@/src/lib/actions/financial";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -17,6 +17,8 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [existingIncomeId, setExistingIncomeId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const {
     register,
@@ -24,6 +26,7 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     control,
     watch,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(incomeSchema),
@@ -43,16 +46,44 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
   const allocations = watch("allocations");
 
   useEffect(() => {
-    async function loadAccounts() {
-      const accs = await getPaymentAccounts();
-      setAccounts(accs);
-      if (accs.length > 0 && fields.length === 1 && !allocations[0].accountId) {
-        // Set first account as default
-        // Note: This would need form manipulation which is complex, so we'll leave it
+    async function loadData() {
+      setLoading(true);
+      try {
+        const [accs, existingIncome] = await Promise.all([
+          getPaymentAccounts(),
+          getIncomeForMonth(monthYear),
+        ]);
+        setAccounts(accs);
+
+        if (existingIncome) {
+          setExistingIncomeId(existingIncome.income.id);
+          // Pre-populate form with existing income
+          reset({
+            monthYear,
+            totalAmount: existingIncome.income.totalAmount,
+            allocations: existingIncome.allocations.map((alloc) => ({
+              accountId: alloc.accountId,
+              amount: alloc.allocatedAmount,
+            })),
+          });
+        } else {
+          setExistingIncomeId(null);
+          // Reset to default if no existing income
+          reset({
+            monthYear,
+            totalAmount: "",
+            allocations: [{ accountId: "", amount: "" }],
+          });
+        }
+      } catch (err) {
+        console.error("Error loading data:", err);
+      } finally {
+        setLoading(false);
       }
     }
-    loadAccounts();
-  }, []);
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthYear]);
 
   const totalAllocated = allocations.reduce(
     (sum, alloc) => sum + (parseFloat(alloc.amount) || 0),
@@ -63,11 +94,24 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     setError(null);
     setSuccess(false);
     try {
-      const result = await createIncome(data);
+      let result;
+      if (existingIncomeId) {
+        result = await updateIncome(existingIncomeId, data);
+      } else {
+        result = await createIncome(data);
+      }
       if ("error" in result) {
         setError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         setSuccess(true);
+        setExistingIncomeId(result.incomeId || null);
+        // Reload data to reflect changes
+        setTimeout(async () => {
+          const existingIncome = await getIncomeForMonth(monthYear);
+          if (existingIncome) {
+            setExistingIncomeId(existingIncome.income.id);
+          }
+        }, 500);
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
@@ -77,7 +121,7 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Setup Income</h1>
+        <h1 className="text-3xl font-bold">{existingIncomeId ? "Edit Income" : "Setup Income"}</h1>
         <p className="text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
       </div>
 
@@ -173,7 +217,7 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
               <div className="flex justify-between">
                 <span className="font-medium">Total Allocated:</span>
                 <span className={`font-bold ${Math.abs(totalAllocated - (parseFloat(totalAmount) || 0)) < 0.01 ? "text-green-600" : "text-red-600"}`}>
-                  ${totalAllocated.toFixed(2)}
+                  ₹{totalAllocated.toFixed(2)}
                 </span>
               </div>
               {Math.abs(totalAllocated - (parseFloat(totalAmount) || 0)) >= 0.01 && (
@@ -188,8 +232,8 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
               <p className="text-sm text-green-600">Income setup completed successfully!</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save Income Setup"}
+            <Button type="submit" className="w-full" disabled={isSubmitting || loading}>
+              {isSubmitting ? "Saving..." : existingIncomeId ? "Update Income" : "Save Income Setup"}
             </Button>
           </form>
         </CardContent>

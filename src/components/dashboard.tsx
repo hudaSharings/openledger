@@ -5,7 +5,7 @@ import { ExportButton } from "./export-button";
 import { DashboardChart } from "./dashboard-chart";
 import Link from "next/link";
 import { Button } from "./ui/button";
-import { Calendar, Plus } from "lucide-react";
+import { Calendar, Plus, DollarSign } from "lucide-react";
 import { getServerSession } from "@/src/lib/get-session";
 
 export async function Dashboard({ monthYear }: { monthYear: string }) {
@@ -31,13 +31,22 @@ export async function Dashboard({ monthYear }: { monthYear: string }) {
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {isAdmin && (
-            <Link href={`/budget/${monthYear}`} className="w-full sm:w-auto">
-              <Button variant="default" className="gap-2 w-full sm:w-auto">
-                <Plus className="h-4 w-4" />
-                <span className="hidden xs:inline">Budget Planning</span>
-                <span className="xs:hidden">Budget</span>
-              </Button>
-            </Link>
+            <>
+              <Link href={`/setup/${monthYear}`} className="w-full sm:w-auto">
+                <Button variant="outline" className="gap-2 w-full sm:w-auto">
+                  <DollarSign className="h-4 w-4" />
+                  <span className="hidden xs:inline">Add Income</span>
+                  <span className="xs:hidden">Income</span>
+                </Button>
+              </Link>
+              <Link href={`/budget/${monthYear}`} className="w-full sm:w-auto">
+                <Button variant="default" className="gap-2 w-full sm:w-auto">
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden xs:inline">Budget Planning</span>
+                  <span className="xs:hidden">Budget</span>
+                </Button>
+              </Link>
+            </>
           )}
           <div className="w-full sm:w-auto">
             <ExportButton monthYear={monthYear} />
@@ -49,9 +58,23 @@ export async function Dashboard({ monthYear }: { monthYear: string }) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+            {isAdmin && (
+              <Link href={`/setup/${monthYear}`}>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Add/Edit Income">
+                  <DollarSign className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">₹{(data.income || 0).toFixed(2)}</div>
+            {isAdmin && (data.income === 0 || !data.income) && (
+              <Link href={`/setup/${monthYear}`} className="mt-2 inline-block">
+                <Button variant="link" size="sm" className="h-auto p-0 text-xs text-blue-600">
+                  Add Income
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
 

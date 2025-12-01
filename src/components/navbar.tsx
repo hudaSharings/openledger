@@ -5,7 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, User, LayoutDashboard, Wallet, Receipt, FileText, Settings } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Wallet, Receipt, FileText, Settings, DollarSign } from "lucide-react";
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -40,6 +40,10 @@ export function Navbar() {
     { href: "/templates", label: "Templates", icon: FileText, adminOnly: true },
     { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
   ].filter((item) => !item.adminOnly || isAdmin);
+
+  // Get current month for income link
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const incomeNavItem = isAdmin ? { href: `/setup/${currentMonth}`, label: "Income", icon: DollarSign, adminOnly: true } : null;
 
   return (
     <>
@@ -79,6 +83,18 @@ export function Navbar() {
                   {item.label}
                 </Link>
               ))}
+              {incomeNavItem && (
+                <Link
+                  href={incomeNavItem.href}
+                  className={`text-sm font-medium transition-colors ${
+                    pathname?.startsWith("/setup")
+                      ? "text-blue-600 border-b-2 border-blue-600 pb-1"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  {incomeNavItem.label}
+                </Link>
+              )}
             </div>
           </div>
 
@@ -152,6 +168,21 @@ export function Navbar() {
                     </Link>
                   );
                 })}
+                {incomeNavItem && (
+                  <Link
+                    href={incomeNavItem.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      pathname?.startsWith("/setup")
+                        ? "text-blue-600 bg-blue-50"
+                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                    title={incomeNavItem.label}
+                  >
+                    <DollarSign className="h-5 w-5 flex-shrink-0" />
+                    <span className="truncate text-sm">{incomeNavItem.label}</span>
+                  </Link>
+                )}
               </nav>
 
               {/* User Info & Sign Out */}
