@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { format } from "date-fns";
 import { Calendar, Receipt, TrendingUp, Clock, IndianRupee } from "lucide-react";
 import { LoadingSpinner } from "./ui/loading-spinner";
+import { formatCurrency } from "@/src/lib/utils";
 
 interface Transaction {
   id: string;
@@ -135,7 +136,7 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
                 Total Expenses
               </div>
               <div className="font-bold text-xl sm:text-2xl text-red-600">
-                ₹{totalAmount.toFixed(2)}
+                ₹{formatCurrency(totalAmount)}
               </div>
             </div>
             <div className="text-center sm:text-right">
@@ -168,20 +169,20 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
             return (
               <div key={group.date} className="border rounded-lg overflow-hidden bg-white shadow-sm">
                 {/* Date Header */}
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b-2 border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-gray-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                       <div className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-blue-600" />
-                        <span className="font-bold text-lg text-gray-900">
+                        <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                        <span className="font-bold text-base sm:text-lg text-gray-900">
                           {format(date, "dd MMMM yyyy")}
                         </span>
                       </div>
-                      <span className="text-sm text-gray-600 font-medium">
+                      <span className="text-xs sm:text-sm text-gray-600 font-medium">
                         {format(date, "EEEE")}
                       </span>
                       {dayPlanned > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 sm:px-2.5 py-0.5 text-xs font-medium text-green-800">
                           <TrendingUp className="h-3 w-3" />
                           {dayPlanned} Planned
                         </span>
@@ -189,15 +190,16 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-gray-500 uppercase tracking-wide">Day Total</div>
-                      <div className="text-2xl font-bold text-red-600">
-                        ₹{dayTotal.toFixed(2)}
+                      <div className="text-xl sm:text-2xl font-bold text-red-600">
+                        ₹{formatCurrency(dayTotal)}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Transactions Table */}
-                <div className="overflow-x-auto">
+                {/* Transactions - Desktop Table / Mobile Cards */}
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gray-50">
@@ -208,10 +210,7 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
                           </div>
                         </TableHead>
                         <TableHead className="min-w-[200px]">Description</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Account</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="w-[200px]">Budget Link</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -225,41 +224,87 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
                           </TableCell>
                           <TableCell>
                             <div className="font-medium text-gray-900">{transaction.description}</div>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                                {transaction.categoryName}
+                              </span>
+                              <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                                {transaction.accountName}
+                              </span>
+                            </div>
                             {transaction.notes && (
-                              <div className="text-xs text-gray-500 mt-1 italic">
+                              <div className="text-xs text-gray-500 mt-2 italic">
                                 {transaction.notes}
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                              {transaction.categoryName}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            {transaction.accountName}
-                          </TableCell>
                           <TableCell className="text-right">
-                            <span className="font-bold text-red-600 text-lg">
-                              ₹{parseFloat(transaction.amount).toFixed(2)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {transaction.budgetItemDescription ? (
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="font-bold text-red-600 text-lg">
+                                ₹{formatCurrency(transaction.amount)}
+                              </span>
+                              {transaction.budgetItemDescription ? (
+                                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
                                   <TrendingUp className="h-3 w-3 mr-1" />
                                   {transaction.budgetItemDescription}
                                 </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-400 italic">Unplanned</span>
-                            )}
+                              ) : (
+                                <span className="text-xs text-gray-400 italic">Unplanned</span>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden divide-y divide-gray-200">
+                  {group.transactions.map((transaction) => (
+                    <div 
+                      key={transaction.id} 
+                      className="p-4 hover:bg-blue-50/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-xs text-gray-500 font-mono">{transaction.time}</span>
+                          </div>
+                          <div className="font-semibold text-gray-900 mb-1 break-words">
+                            {transaction.description}
+                          </div>
+                          {transaction.notes && (
+                            <div className="text-xs text-gray-500 mt-1 italic break-words">
+                              {transaction.notes}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-bold text-red-600 text-lg">
+                            ₹{formatCurrency(transaction.amount)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                          {transaction.categoryName}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                          {transaction.accountName}
+                        </span>
+                        {transaction.budgetItemDescription ? (
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                            <TrendingUp className="h-3 w-3 mr-1" />
+                            {transaction.budgetItemDescription}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Unplanned</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             );

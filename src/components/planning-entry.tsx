@@ -17,6 +17,7 @@ import { format, subMonths, addMonths, parse } from "date-fns";
 import { Trash2, Plus, Copy, Search, X, Save, ChevronLeft, ChevronRight, RotateCcw, Pencil, Lock, Filter } from "lucide-react";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/src/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -958,7 +959,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
             <CardTitle className="text-sm font-medium">Total Planned</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{totalPlanned.toFixed(2)}</div>
+            <div className="text-2xl font-bold">₹{formatCurrency(totalPlanned)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -966,7 +967,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
             <CardTitle className="text-sm font-medium">Mandatory Amount</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{mandatoryTotal.toFixed(2)}</div>
+            <div className="text-2xl font-bold">₹{formatCurrency(mandatoryTotal)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -982,17 +983,18 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
       {/* Budget Items Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <CardTitle>Planned Expenses</CardTitle>
               <CardDescription>All budget items for this month</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-500 flex-shrink-0" />
               <Button
                 variant={categoryFilter === "all" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setCategoryFilter("all")}
+                className="text-xs sm:text-sm"
               >
                 All
               </Button>
@@ -1000,7 +1002,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                 variant={categoryFilter === "mandatory" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setCategoryFilter("mandatory")}
-                className="data-[state=active]:bg-red-50 data-[state=active]:text-red-700"
+                className="text-xs sm:text-sm data-[state=active]:bg-red-50 data-[state=active]:text-red-700"
               >
                 Mandatory
               </Button>
@@ -1008,7 +1010,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                 variant={categoryFilter === "periodic" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setCategoryFilter("periodic")}
-                className="data-[state=active]:bg-yellow-50 data-[state=active]:text-yellow-700"
+                className="text-xs sm:text-sm data-[state=active]:bg-yellow-50 data-[state=active]:text-yellow-700"
               >
                 Periodic
               </Button>
@@ -1016,7 +1018,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                 variant={categoryFilter === "ad_hoc" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setCategoryFilter("ad_hoc")}
-                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700"
+                className="text-xs sm:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700"
               >
                 Ad Hoc
               </Button>
@@ -1029,33 +1031,165 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
               No budget items yet. Add your first item above or copy from a previous month.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Planned Amount</TableHead>
-                    <TableHead className="text-right">Actual Spent</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="text-right w-[80px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {budgetItems
-                    .filter((item) => {
-                      if (categoryFilter === "all") return true;
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Planned Amount</TableHead>
+                      <TableHead className="text-right">Actual Spent</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right w-[80px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {budgetItems
+                      .filter((item) => {
+                        if (categoryFilter === "all") return true;
+                        const categoryType = item.categoryType || "ad_hoc";
+                        return categoryType === categoryFilter;
+                      })
+                      .map((item) => {
+                      const actualSpent = item.actualSpent || 0;
+                      const balance = parseFloat(item.amount) - actualSpent;
                       const categoryType = item.categoryType || "ad_hoc";
-                      return categoryType === categoryFilter;
-                    })
-                    .map((item) => {
+                      return (
+                        <TableRow key={item.id} className={`group ${getRowColor(item.color, categoryType)}`}>
+                          <TableCell>
+                            <div className="space-y-2">
+                              <div className="font-medium text-gray-900">{item.description}</div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    categoryType === "mandatory"
+                                      ? "bg-red-100 text-red-800"
+                                      : categoryType === "periodic"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-blue-100 text-blue-800"
+                                  }`}
+                                >
+                                  {item.categoryName}
+                                </span>
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700">
+                                  {item.accountName}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            ₹{formatCurrency(item.amount)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ₹{formatCurrency(actualSpent)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-medium ${
+                              balance >= 0 ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            ₹{formatCurrency(balance)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {isAdmin ? (
+                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEdit(item)}
+                                  className="h-8 w-8 p-0 hover:bg-blue-100"
+                                  title="Edit"
+                                >
+                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(item.id)}
+                                  className="h-8 w-8 p-0 hover:bg-red-100"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Lock className="h-4 w-4 text-gray-400 mx-auto" />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    <TableRow className="font-bold bg-gray-50">
+                      <TableCell>Total</TableCell>
+                      <TableCell className="text-right">
+                        ₹{formatCurrency(
+                          budgetItems
+                            .filter((item) => {
+                              if (categoryFilter === "all") return true;
+                              const categoryType = item.categoryType || "ad_hoc";
+                              return categoryType === categoryFilter;
+                            })
+                            .reduce((sum, item) => sum + parseFloat(item.amount), 0)
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        ₹{formatCurrency(
+                          budgetItems
+                            .filter((item) => {
+                              if (categoryFilter === "all") return true;
+                              const categoryType = item.categoryType || "ad_hoc";
+                              return categoryType === categoryFilter;
+                            })
+                            .reduce((sum, item) => sum + (item.actualSpent || 0), 0)
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        ₹{formatCurrency(
+                          budgetItems
+                            .filter((item) => {
+                              if (categoryFilter === "all") return true;
+                              const categoryType = item.categoryType || "ad_hoc";
+                              return categoryType === categoryFilter;
+                            })
+                            .reduce((sum, item) => sum + parseFloat(item.amount), 0) -
+                          budgetItems
+                            .filter((item) => {
+                              if (categoryFilter === "all") return true;
+                              const categoryType = item.categoryType || "ad_hoc";
+                              return categoryType === categoryFilter;
+                            })
+                            .reduce((sum, item) => sum + (item.actualSpent || 0), 0)
+                        )}
+                      </TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
+                {budgetItems
+                  .filter((item) => {
+                    if (categoryFilter === "all") return true;
+                    const categoryType = item.categoryType || "ad_hoc";
+                    return categoryType === categoryFilter;
+                  })
+                  .map((item) => {
                     const actualSpent = item.actualSpent || 0;
                     const balance = parseFloat(item.amount) - actualSpent;
                     const categoryType = item.categoryType || "ad_hoc";
                     return (
-                      <TableRow key={item.id} className={`group ${getRowColor(item.color, categoryType)}`}>
-                        <TableCell>
-                          <div className="space-y-2">
-                            <div className="font-medium text-gray-900">{item.description}</div>
+                      <div
+                        key={item.id}
+                        className={`p-4 rounded-lg border ${getRowColor(item.color, categoryType)}`}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-gray-900 mb-2 break-words">
+                              {item.description}
+                            </div>
                             <div className="flex flex-wrap items-center gap-2">
                               <span
                                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -1073,23 +1207,8 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                               </span>
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          ₹{parseFloat(item.amount).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ₹{actualSpent.toFixed(2)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-medium ${
-                            balance >= 0 ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
-                          ₹{balance.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {isAdmin ? (
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {isAdmin && (
+                            <div className="flex items-center gap-2 flex-shrink-0">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1109,58 +1228,88 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
                             </div>
-                          ) : (
-                            <Lock className="h-4 w-4 text-gray-400 mx-auto" />
                           )}
-                        </TableCell>
-                      </TableRow>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-200">
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">Planned</div>
+                            <div className="font-semibold text-gray-900">
+                              ₹{formatCurrency(item.amount)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">Spent</div>
+                            <div className="font-medium text-gray-700">
+                              ₹{formatCurrency(actualSpent)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">Balance</div>
+                            <div className={`font-semibold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              ₹{formatCurrency(balance)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
-                  <TableRow className="font-bold bg-gray-50">
-                    <TableCell>Total</TableCell>
-                    <TableCell className="text-right">
-                      ₹{budgetItems
-                        .filter((item) => {
-                          if (categoryFilter === "all") return true;
-                          const categoryType = item.categoryType || "ad_hoc";
-                          return categoryType === categoryFilter;
-                        })
-                        .reduce((sum, item) => sum + parseFloat(item.amount), 0)
-                        .toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      ₹{budgetItems
-                        .filter((item) => {
-                          if (categoryFilter === "all") return true;
-                          const categoryType = item.categoryType || "ad_hoc";
-                          return categoryType === categoryFilter;
-                        })
-                        .reduce((sum, item) => sum + (item.actualSpent || 0), 0)
-                        .toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      ₹{(
-                        budgetItems
-                          .filter((item) => {
-                            if (categoryFilter === "all") return true;
-                            const categoryType = item.categoryType || "ad_hoc";
-                            return categoryType === categoryFilter;
-                          })
-                          .reduce((sum, item) => sum + parseFloat(item.amount), 0) -
-                        budgetItems
-                          .filter((item) => {
-                            if (categoryFilter === "all") return true;
-                            const categoryType = item.categoryType || "ad_hoc";
-                            return categoryType === categoryFilter;
-                          })
-                          .reduce((sum, item) => sum + (item.actualSpent || 0), 0)
-                      ).toFixed(2)}
-                    </TableCell>
-                    <TableCell></TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
+                {/* Mobile Total */}
+                <div className="p-4 rounded-lg bg-gray-50 border-2 border-gray-200 font-bold">
+                  <div className="text-sm text-gray-600 mb-2">Total</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Planned</div>
+                      <div className="text-gray-900">
+                        ₹{formatCurrency(
+                          budgetItems
+                            .filter((item) => {
+                              if (categoryFilter === "all") return true;
+                              const categoryType = item.categoryType || "ad_hoc";
+                              return categoryType === categoryFilter;
+                            })
+                            .reduce((sum, item) => sum + parseFloat(item.amount), 0)
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Spent</div>
+                      <div className="text-gray-700">
+                        ₹{formatCurrency(
+                          budgetItems
+                            .filter((item) => {
+                              if (categoryFilter === "all") return true;
+                              const categoryType = item.categoryType || "ad_hoc";
+                              return categoryType === categoryFilter;
+                            })
+                            .reduce((sum, item) => sum + (item.actualSpent || 0), 0)
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Balance</div>
+                      <div className="text-gray-900">
+                        ₹{formatCurrency(
+                          budgetItems
+                            .filter((item) => {
+                              if (categoryFilter === "all") return true;
+                              const categoryType = item.categoryType || "ad_hoc";
+                              return categoryType === categoryFilter;
+                            })
+                            .reduce((sum, item) => sum + parseFloat(item.amount), 0) -
+                          budgetItems
+                            .filter((item) => {
+                              if (categoryFilter === "all") return true;
+                              const categoryType = item.categoryType || "ad_hoc";
+                              return categoryType === categoryFilter;
+                            })
+                            .reduce((sum, item) => sum + (item.actualSpent || 0), 0)
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
