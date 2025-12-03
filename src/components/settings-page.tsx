@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Copy, Check, Mail, Tag, Plus, Users, Settings as SettingsIcon } from "lucide-react";
+import { LoadingSpinner } from "./ui/loading-spinner";
 import { MemberManagement } from "./member-management";
 
 export function SettingsPage() {
@@ -244,7 +245,14 @@ export function SettingsPage() {
                       className="flex-1 bg-purple-600 hover:bg-purple-700"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? "Creating..." : "Create Invite"}
+                      {isSubmitting ? (
+                        <span className="flex items-center gap-2">
+                          <LoadingSpinner size="sm" className="border-white" />
+                          Creating...
+                        </span>
+                      ) : (
+                        "Create Invite"
+                      )}
                     </Button>
                   </div>
                 </form>
@@ -370,7 +378,14 @@ export function SettingsPage() {
                       className="flex-1 bg-green-600 hover:bg-green-700"
                       disabled={isSubmittingCategory}
                     >
-                      {isSubmittingCategory ? "Creating..." : "Create Category"}
+                      {isSubmittingCategory ? (
+                        <span className="flex items-center gap-2">
+                          <LoadingSpinner size="sm" className="border-white" />
+                          Creating...
+                        </span>
+                      ) : (
+                        "Create Category"
+                      )}
                     </Button>
                   </div>
                 </form>

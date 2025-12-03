@@ -5,7 +5,7 @@ import { ExportButton } from "./export-button";
 import { DashboardChart } from "./dashboard-chart";
 import Link from "next/link";
 import { Button } from "./ui/button";
-import { Calendar, Plus, DollarSign } from "lucide-react";
+import { Calendar, Plus, IndianRupee } from "lucide-react";
 import { getServerSession } from "@/src/lib/get-session";
 
 export async function Dashboard({ monthYear }: { monthYear: string }) {
@@ -34,7 +34,7 @@ export async function Dashboard({ monthYear }: { monthYear: string }) {
             <>
               <Link href={`/setup/${monthYear}`} className="w-full sm:w-auto">
                 <Button variant="outline" className="gap-2 w-full sm:w-auto">
-                  <DollarSign className="h-4 w-4" />
+                  <IndianRupee className="h-4 w-4" />
                   <span className="hidden xs:inline">Add Income</span>
                   <span className="xs:hidden">Income</span>
                 </Button>
@@ -61,7 +61,7 @@ export async function Dashboard({ monthYear }: { monthYear: string }) {
             {isAdmin && (
               <Link href={`/setup/${monthYear}`}>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Add/Edit Income">
-                  <DollarSign className="h-4 w-4" />
+                  <IndianRupee className="h-4 w-4" />
                 </Button>
               </Link>
             )}

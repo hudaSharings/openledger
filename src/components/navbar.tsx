@@ -5,17 +5,28 @@ import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, User, LayoutDashboard, Wallet, Receipt, FileText, Settings, DollarSign } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Wallet, Receipt, FileText, Settings, IndianRupee } from "lucide-react";
+import { getHouseholdName } from "@/src/lib/actions/auth";
 
 export function Navbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [householdName, setHouseholdName] = useState<string | null>(null);
 
   // Close menu when route changes
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  // Fetch household name
+  useEffect(() => {
+    if (session?.user?.householdId) {
+      getHouseholdName()
+        .then((name) => setHouseholdName(name))
+        .catch((err) => console.error("Failed to fetch household name:", err));
+    }
+  }, [session]);
 
   // Prevent body scroll when menu is open
   useEffect(() => {
@@ -43,7 +54,7 @@ export function Navbar() {
 
   // Get current month for income link
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const incomeNavItem = isAdmin ? { href: `/setup/${currentMonth}`, label: "Income", icon: DollarSign, adminOnly: true } : null;
+  const incomeNavItem = isAdmin ? { href: `/setup/${currentMonth}`, label: "Income", icon: IndianRupee, adminOnly: true } : null;
 
   return (
     <>
@@ -61,12 +72,19 @@ export function Navbar() {
               <Menu className="h-5 w-5" />
             </Button>
 
-            <Link 
-              href="/" 
-              className="text-lg md:text-xl font-bold text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              OpenLedger
-            </Link>
+            <div className="flex flex-col items-center">
+              <Link 
+                href="/" 
+                className="text-lg md:text-xl font-bold text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                OpenLedger
+              </Link>
+              {householdName && (
+                <span className="text-xs md:text-sm font-medium text-gray-600 truncate max-w-[150px] md:max-w-[200px] text-center">
+                  {householdName}
+                </span>
+              )}
+            </div>
             
             {/* Desktop Navigation */}
             <div className="hidden md:flex gap-6">
@@ -185,7 +203,7 @@ export function Navbar() {
                     }`}
                     title={incomeNavItem.label}
                   >
-                    <DollarSign className="h-5 w-5 flex-shrink-0" />
+                    <IndianRupee className="h-5 w-5 flex-shrink-0" />
                     <span className="truncate text-sm">{incomeNavItem.label}</span>
                   </Link>
                 )}

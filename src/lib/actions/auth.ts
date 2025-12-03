@@ -250,6 +250,23 @@ export async function acceptInvite(token: string, password: string) {
   return { success: true };
 }
 
+export async function getHouseholdName() {
+  const session = await getServerSession();
+  if (!session?.user?.householdId) {
+    throw new Error("Unauthorized");
+  }
+
+  const [household] = await db
+    .select({
+      name: households.name,
+    })
+    .from(households)
+    .where(eq(households.id, session.user.householdId))
+    .limit(1);
+
+  return household?.name || null;
+}
+
 export async function getHouseholdMembers() {
   const session = await getServerSession();
   if (!session?.user?.householdId) {

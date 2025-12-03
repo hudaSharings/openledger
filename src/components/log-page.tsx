@@ -20,6 +20,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { format } from "date-fns";
 import { Plus, Link as LinkIcon, X } from "lucide-react";
+import { LoadingSpinner } from "./ui/loading-spinner";
 
 interface LogPageProps {
   onTransactionAdded?: () => void;
@@ -401,7 +402,14 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
               className="flex-1 bg-blue-600 hover:bg-blue-700"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Saving..." : "Add Transaction"}
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <LoadingSpinner size="sm" className="border-white" />
+                  Saving...
+                </span>
+              ) : (
+                "Add Transaction"
+              )}
             </Button>
           </div>
         </form>

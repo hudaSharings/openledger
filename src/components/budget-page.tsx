@@ -10,6 +10,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { LoadingSpinner } from "./ui/loading-spinner";
 import { format } from "date-fns";
 
 export function BudgetPage({ monthYear }: { monthYear: string }) {
@@ -156,7 +157,14 @@ export function BudgetPage({ monthYear }: { monthYear: string }) {
             )}
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Adding..." : "Add Budget Item"}
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <LoadingSpinner size="sm" className="border-white" />
+                  Adding...
+                </span>
+              ) : (
+                "Add Budget Item"
+              )}
             </Button>
           </form>
         </CardContent>

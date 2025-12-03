@@ -343,7 +343,14 @@ export function TemplatesPage() {
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? (editingTemplate ? "Saving..." : "Creating...") : (editingTemplate ? "Save Changes" : "Create Template")}
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <LoadingSpinner size="sm" className="border-white" />
+                      {editingTemplate ? "Saving..." : "Creating..."}
+                    </span>
+                  ) : (
+                    editingTemplate ? "Save Changes" : "Create Template"
+                  )}
                 </Button>
               </div>
             </form>
@@ -567,7 +574,14 @@ export function TemplatesPage() {
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Saving..." : "Save Changes"}
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingSpinner size="sm" className="border-white" />
+                    Saving...
+                  </span>
+                ) : (
+                  "Save Changes"
+                )}
               </Button>
             </div>
           </form>

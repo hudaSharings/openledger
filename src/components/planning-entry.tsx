@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { format, subMonths, addMonths, parse } from "date-fns";
 import { Trash2, Plus, Copy, Search, X, Save, ChevronLeft, ChevronRight, RotateCcw, Pencil, Lock } from "lucide-react";
+import { LoadingSpinner } from "./ui/loading-spinner";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -668,7 +669,14 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Adding..." : "Add Budget Item"}
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <LoadingSpinner size="sm" className="border-white" />
+                        Adding...
+                      </span>
+                    ) : (
+                      "Add Budget Item"
+                    )}
                   </Button>
                 </div>
               </form>
@@ -887,7 +895,14 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Saving..." : "Save Changes"}
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <LoadingSpinner size="sm" className="border-white" />
+                        Saving...
+                      </span>
+                    ) : (
+                      "Save Changes"
+                    )}
                   </Button>
                 </div>
               </form>

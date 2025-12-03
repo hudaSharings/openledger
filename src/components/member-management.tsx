@@ -6,8 +6,9 @@ import { useSession } from "next-auth/react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Users, Shield, User, Loader2 } from "lucide-react";
+import { Users, Shield, User } from "lucide-react";
 import { format } from "date-fns";
+import { LoadingSpinner } from "./ui/loading-spinner";
 
 interface Member {
   id: string;
@@ -60,8 +61,9 @@ export function MemberManagement() {
   if (loading) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-8">
+          <LoadingSpinner size="lg" />
+          <p className="text-sm text-gray-600">Loading members...</p>
         </CardContent>
       </Card>
     );
@@ -151,7 +153,7 @@ export function MemberManagement() {
                     </SelectContent>
                   </Select>
                   {updating === member.id && (
-                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                    <LoadingSpinner size="sm" />
                   )}
                 </div>
               </div>

@@ -5,7 +5,8 @@ import { getTransactionsByDate } from "@/src/lib/actions/transactions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { format } from "date-fns";
-import { Calendar, Receipt, TrendingUp, Clock, DollarSign } from "lucide-react";
+import { Calendar, Receipt, TrendingUp, Clock, IndianRupee } from "lucide-react";
+import { LoadingSpinner } from "./ui/loading-spinner";
 
 interface Transaction {
   id: string;
@@ -50,9 +51,9 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
     return (
       <Card className="shadow-sm">
         <CardContent className="py-12">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">Loading transactions...</p>
+          <div className="flex flex-col items-center gap-4">
+            <LoadingSpinner size="lg" />
+            <p className="text-gray-600">Loading transactions...</p>
           </div>
         </CardContent>
       </Card>
@@ -130,7 +131,7 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
           <div className="flex flex-wrap gap-4 sm:gap-6">
             <div className="text-center sm:text-right">
               <div className="flex items-center gap-1 text-gray-500 text-xs sm:text-sm mb-1">
-                <DollarSign className="h-4 w-4" />
+                <IndianRupee className="h-4 w-4" />
                 Total Expenses
               </div>
               <div className="font-bold text-xl sm:text-2xl text-red-600">

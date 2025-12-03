@@ -11,6 +11,7 @@ import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { LoadingSpinner } from "@/src/components/ui/loading-spinner";
 import Link from "next/link";
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -90,7 +91,14 @@ export default function RegisterPage() {
               </div>
             )}
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Account"}
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <LoadingSpinner size="sm" className="border-white" />
+                  Creating...
+                </span>
+              ) : (
+                "Create Account"
+              )}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-gray-600">

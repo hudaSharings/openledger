@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { format } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
+import { LoadingSpinner, LoadingOverlay } from "./ui/loading-spinner";
 
 interface IncomeEntry {
   income: {
@@ -147,6 +148,25 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
       setError("Failed to delete income entry");
     }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Income Management</h1>
+          <p className="text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
+        </div>
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center gap-4">
+              <LoadingSpinner size="lg" />
+              <p className="text-gray-600">Loading income data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -373,7 +393,14 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
                 Cancel
               </Button>
               <Button type="submit" className="flex-1" disabled={isSubmitting || loading}>
-                {isSubmitting ? "Adding..." : "Add Income Entry"}
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingSpinner size="sm" className="border-white" />
+                    Adding...
+                  </span>
+                ) : (
+                  "Add Income Entry"
+                )}
               </Button>
             </div>
           </form>

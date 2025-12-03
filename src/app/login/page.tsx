@@ -11,18 +11,22 @@ import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { LoadingSpinner } from "@/src/components/ui/loading-spinner";
 import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { data: session, status, update } = useSession();
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
   });
@@ -37,7 +41,8 @@ export default function LoginPage() {
 
   const onSubmit = async (data: z.infer<typeof loginSchema>) => {
     setError(null);
-    setIsRedirecting(false);
+    setIsSuccess(false);
+    setIsSubmitting(true);
     
     try {
       const result = await signIn("credentials", {
@@ -48,16 +53,20 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError("Invalid email or password");
+        setIsSubmitting(false);
         return;
       }
 
       if (result?.ok) {
+        // Show success message immediately
+        setIsSuccess(true);
+        setIsSubmitting(false);
+        
         // Force session refresh
         await update();
         
-        // Wait for cookie to be set and session to be available
-        // Use a longer delay to ensure middleware can read the cookie
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Show success for a brief moment, then redirect
+        await new Promise(resolve => setTimeout(resolve, 800));
         
         // Do a hard redirect with full page reload
         // This ensures the cookie is sent with the request
@@ -68,6 +77,7 @@ export default function LoginPage() {
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -76,8 +86,27 @@ export default function LoginPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
         <Card className="w-full max-w-md">
-          <CardContent className="py-8">
-            <p className="text-center text-gray-600">Loading...</p>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center gap-4">
+              <LoadingSpinner size="lg" />
+              <p className="text-center text-gray-600">Checking authentication...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show redirecting state
+  if (isRedirecting) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center gap-4">
+              <LoadingSpinner size="lg" />
+              <p className="text-center text-gray-600">Redirecting to dashboard...</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -122,16 +151,36 @@ export default function LoginPage() {
               )}
             </div>
             {error && (
-              <div className="rounded-md bg-red-50 p-3">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="rounded-md bg-red-50 p-3 border border-red-200">
+                <p className="text-sm text-red-600 font-medium">{error}</p>
+              </div>
+            )}
+            {isSuccess && (
+              <div className="rounded-md bg-green-50 p-3 border border-green-200">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <p className="text-sm text-green-600 font-medium">Login successful! Redirecting...</p>
+                </div>
               </div>
             )}
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSuccess}
             >
-              {isSubmitting ? "Signing in..." : "Sign In"}
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <LoadingSpinner size="sm" className="border-white" />
+                  Signing in...
+                </span>
+              ) : isSuccess ? (
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Success!
+                </span>
+              ) : (
+                "Sign In"
+              )}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-gray-600">
