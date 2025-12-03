@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { format, subMonths, addMonths, parse } from "date-fns";
-import { Trash2, Plus, Copy, Search, X, Save, ChevronLeft, ChevronRight, RotateCcw, Pencil, Lock } from "lucide-react";
+import { Trash2, Plus, Copy, Search, X, Save, ChevronLeft, ChevronRight, RotateCcw, Pencil, Lock, Filter } from "lucide-react";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { useRouter } from "next/navigation";
 import {
@@ -69,6 +69,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<BudgetItem | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all"); // "all", "mandatory", "periodic", "ad_hoc"
 
   const {
     register,
@@ -981,8 +982,46 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
       {/* Budget Items Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Planned Expenses</CardTitle>
-          <CardDescription>All budget items for this month</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Planned Expenses</CardTitle>
+              <CardDescription>All budget items for this month</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-500" />
+              <Button
+                variant={categoryFilter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCategoryFilter("all")}
+              >
+                All
+              </Button>
+              <Button
+                variant={categoryFilter === "mandatory" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCategoryFilter("mandatory")}
+                className="data-[state=active]:bg-red-50 data-[state=active]:text-red-700"
+              >
+                Mandatory
+              </Button>
+              <Button
+                variant={categoryFilter === "periodic" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCategoryFilter("periodic")}
+                className="data-[state=active]:bg-yellow-50 data-[state=active]:text-yellow-700"
+              >
+                Periodic
+              </Button>
+              <Button
+                variant={categoryFilter === "ad_hoc" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCategoryFilter("ad_hoc")}
+                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700"
+              >
+                Ad Hoc
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {budgetItems.length === 0 ? (
@@ -1002,7 +1041,13 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {budgetItems.map((item) => {
+                  {budgetItems
+                    .filter((item) => {
+                      if (categoryFilter === "all") return true;
+                      const categoryType = item.categoryType || "ad_hoc";
+                      return categoryType === categoryFilter;
+                    })
+                    .map((item) => {
                     const actualSpent = item.actualSpent || 0;
                     const balance = parseFloat(item.amount) - actualSpent;
                     const categoryType = item.categoryType || "ad_hoc";
@@ -1073,12 +1118,43 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                   })}
                   <TableRow className="font-bold bg-gray-50">
                     <TableCell>Total</TableCell>
-                    <TableCell className="text-right">₹{totalPlanned.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
-                      ₹{budgetItems.reduce((sum, item) => sum + (item.actualSpent || 0), 0).toFixed(2)}
+                      ₹{budgetItems
+                        .filter((item) => {
+                          if (categoryFilter === "all") return true;
+                          const categoryType = item.categoryType || "ad_hoc";
+                          return categoryType === categoryFilter;
+                        })
+                        .reduce((sum, item) => sum + parseFloat(item.amount), 0)
+                        .toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
-                      ₹{(totalPlanned - budgetItems.reduce((sum, item) => sum + (item.actualSpent || 0), 0)).toFixed(2)}
+                      ₹{budgetItems
+                        .filter((item) => {
+                          if (categoryFilter === "all") return true;
+                          const categoryType = item.categoryType || "ad_hoc";
+                          return categoryType === categoryFilter;
+                        })
+                        .reduce((sum, item) => sum + (item.actualSpent || 0), 0)
+                        .toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ₹{(
+                        budgetItems
+                          .filter((item) => {
+                            if (categoryFilter === "all") return true;
+                            const categoryType = item.categoryType || "ad_hoc";
+                            return categoryType === categoryFilter;
+                          })
+                          .reduce((sum, item) => sum + parseFloat(item.amount), 0) -
+                        budgetItems
+                          .filter((item) => {
+                            if (categoryFilter === "all") return true;
+                            const categoryType = item.categoryType || "ad_hoc";
+                            return categoryType === categoryFilter;
+                          })
+                          .reduce((sum, item) => sum + (item.actualSpent || 0), 0)
+                      ).toFixed(2)}
                     </TableCell>
                     <TableCell></TableCell>
                   </TableRow>

@@ -481,21 +481,61 @@ export async function getDashboardData(monthYear: string) {
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 3);
 
-  // Category data for chart
-  const categoryData = budgetItemsList.map((item) => {
-    const categoryTransactions = transactionsList.filter(
-      (t) => t.categoryId === item.categoryId
-    );
-    const actual = categoryTransactions.reduce(
-      (sum, t) => sum + parseFloat(t.amount),
-      0
-    );
+  // Group budget items by category and calculate totals
+  const budgetByCategory = budgetItemsList.reduce(
+    (acc, item) => {
+      const categoryName = item.categoryName;
+      if (!acc[categoryName]) {
+        acc[categoryName] = {
+          category: categoryName,
+          categoryType: item.categoryType,
+          categoryId: item.categoryId,
+          planned: 0,
+        };
+      }
+      acc[categoryName].planned += parseFloat(item.amount);
+      return acc;
+    },
+    {} as Record<string, { category: string; categoryType: string; categoryId: string; planned: number }>
+  );
+
+  // Calculate actual spent per category (all transactions in that category)
+  // Get all unique category IDs that have budget items
+  const categoryIdsWithBudget = new Set(budgetItemsList.map(item => item.categoryId));
+  const actualByCategory: Record<string, number> = {};
+  
+  // Sum all transactions for categories that have budget items
+  transactionsList.forEach((t) => {
+    if (categoryIdsWithBudget.has(t.categoryId)) {
+      const categoryName = t.categoryName;
+      if (!actualByCategory[categoryName]) {
+        actualByCategory[categoryName] = 0;
+      }
+      actualByCategory[categoryName] += parseFloat(t.amount);
+    }
+  });
+
+  // Convert to array for chart data
+  const categoryData = Object.values(budgetByCategory).map((cat) => {
+    const actual = actualByCategory[cat.category] || 0;
     return {
-      category: item.categoryName,
-      planned: item.amount,
+      category: cat.category,
+      planned: cat.planned.toString(),
       actual: actual.toString(),
     };
   });
+
+  // Budget by category summary (for the new section)
+  const budgetByCategorySummary = Object.values(budgetByCategory).map((cat) => {
+    const actual = actualByCategory[cat.category] || 0;
+    return {
+      categoryName: cat.category,
+      categoryType: cat.categoryType,
+      budgetAmount: cat.planned,
+      actualSpent: actual,
+      remaining: cat.planned - actual,
+    };
+  }).sort((a, b) => b.budgetAmount - a.budgetAmount);
 
   return {
     income: totalIncome,
@@ -506,6 +546,7 @@ export async function getDashboardData(monthYear: string) {
     accountBalances,
     topUnplannedCategories,
     categoryData,
+    budgetByCategory: budgetByCategorySummary,
   };
 }
 
@@ -598,6 +639,106 @@ export async function getBudgetItems(monthYear: string) {
     categoryType: item.categoryType || "ad_hoc",
     actualSpent: spentByBudgetItem[item.id] || 0,
   }));
+}
+
+export async function getBudgetByCategory(monthYear: string) {
+  const householdId = await getHouseholdId();
+
+  // Get budget items
+  const budgetItemsList = await db
+    .select({
+      id: budgetItems.id,
+      description: budgetItems.description,
+      amount: budgetItems.amount,
+      categoryId: budgetItems.categoryId,
+      categoryName: categories.name,
+      categoryType: categories.type,
+      accountId: budgetItems.allocatedToAccountId,
+    })
+    .from(budgetItems)
+    .innerJoin(categories, eq(budgetItems.categoryId, categories.id))
+    .where(
+      and(
+        eq(budgetItems.householdId, householdId),
+        eq(budgetItems.monthYear, monthYear)
+      )
+    );
+
+  // Get transactions for the month
+  const startDate = new Date(`${monthYear}-01`);
+  const endDate = new Date(startDate);
+  endDate.setMonth(endDate.getMonth() + 1);
+
+  const transactionsList = await db
+    .select({
+      id: transactions.id,
+      date: transactions.date,
+      description: transactions.description,
+      amount: transactions.amount,
+      categoryId: transactions.categoryId,
+      categoryName: categories.name,
+      categoryType: categories.type,
+      paidFromAccountId: transactions.paidFromAccountId,
+      notes: transactions.notes,
+      budgetItemId: transactions.budgetItemId,
+    })
+    .from(transactions)
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        eq(transactions.householdId, householdId),
+        gte(transactions.date, startDate),
+        lte(transactions.date, endDate)
+      )
+    )
+    .orderBy(desc(transactions.date));
+
+  // Group budget items by category and calculate totals
+  const budgetByCategory = budgetItemsList.reduce(
+    (acc, item) => {
+      const categoryName = item.categoryName;
+      if (!acc[categoryName]) {
+        acc[categoryName] = {
+          category: categoryName,
+          categoryType: item.categoryType,
+          categoryId: item.categoryId,
+          planned: 0,
+        };
+      }
+      acc[categoryName].planned += parseFloat(item.amount);
+      return acc;
+    },
+    {} as Record<string, { category: string; categoryType: string; categoryId: string; planned: number }>
+  );
+
+  // Calculate actual spent per category (all transactions in that category)
+  const categoryIdsWithBudget = new Set(budgetItemsList.map(item => item.categoryId));
+  const actualByCategory: Record<string, number> = {};
+  
+  // Sum all transactions for categories that have budget items
+  transactionsList.forEach((t) => {
+    if (categoryIdsWithBudget.has(t.categoryId)) {
+      const categoryName = t.categoryName;
+      if (!actualByCategory[categoryName]) {
+        actualByCategory[categoryName] = 0;
+      }
+      actualByCategory[categoryName] += parseFloat(t.amount);
+    }
+  });
+
+  // Budget by category summary
+  const budgetByCategorySummary = Object.values(budgetByCategory).map((cat) => {
+    const actual = actualByCategory[cat.category] || 0;
+    return {
+      categoryName: cat.category,
+      categoryType: cat.categoryType,
+      budgetAmount: cat.planned,
+      actualSpent: actual,
+      remaining: cat.planned - actual,
+    };
+  }).sort((a, b) => b.budgetAmount - a.budgetAmount);
+
+  return budgetByCategorySummary;
 }
 
 export async function createCategory(name: string, type: "mandatory" | "periodic" | "ad_hoc") {
