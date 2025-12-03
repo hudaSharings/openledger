@@ -55,6 +55,7 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       date: currentDate.toISOString(),
+      time: format(currentDate, "HH:mm"),
       description: "",
       amount: "",
       categoryId: "",
@@ -68,6 +69,7 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
   const accountId = watch("paidFromAccountId");
   const budgetItemId = watch("budgetItemId");
   const dateValue = watch("date");
+  const timeValue = watch("time");
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   useEffect(() => {
@@ -107,11 +109,33 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
     setError(null);
     setSuccess(false);
     try {
-      const result = await createTransaction(data);
+      // Combine date and time before submitting
+      const timeValue = watch("time") || format(new Date(), "HH:mm");
+      const dateValue = watch("date");
+      
+      // Parse the date string and combine with time
+      let dateObj: Date;
+      if (typeof dateValue === "string" && dateValue.includes("T")) {
+        // Already has time component
+        dateObj = new Date(dateValue);
+      } else {
+        // Date only, need to add time
+        const dateStr = dateValue ? format(new Date(dateValue), "yyyy-MM-dd") : currentDateString;
+        const [hours, minutes] = timeValue.split(":");
+        dateObj = new Date(`${dateStr}T${hours}:${minutes}:00`);
+      }
+      
+      const transactionData = {
+        ...data,
+        date: dateObj.toISOString(),
+      };
+      
+      const result = await createTransaction(transactionData);
       if (result && result.success) {
         setSuccess(true);
         reset({
           date: currentDate.toISOString(),
+          time: format(currentDate, "HH:mm"),
           description: "",
           amount: "",
           categoryId: "",
@@ -140,6 +164,7 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
       // Reset form when dialog closes
       reset({
         date: currentDate.toISOString(),
+        time: format(currentDate, "HH:mm"),
         description: "",
         amount: "",
         categoryId: "",
@@ -150,9 +175,10 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
       setError(null);
       setSuccess(false);
     } else {
-      // When opening, ensure date is set to current date in correct format
+      // When opening, ensure date and time are set to current date/time in correct format
       const today = new Date();
       setValue("date", today.toISOString());
+      setValue("time", format(today, "HH:mm"));
     }
   };
 
@@ -217,7 +243,7 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
           </div>
 
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
               <Label htmlFor="date" className="text-sm font-medium">Date</Label>
               <Input
                 id="date"
@@ -228,7 +254,12 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
                       const today = new Date();
                       return today.toISOString();
                     }
-                    return new Date(value).toISOString();
+                    // Combine date with time if time exists
+                    const timeValue = watch("time") || format(new Date(), "HH:mm");
+                    const [hours, minutes] = timeValue.split(":");
+                    const dateObj = new Date(value);
+                    dateObj.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                    return dateObj.toISOString();
                   },
                 })}
                 value={dateValue ? format(new Date(dateValue), "yyyy-MM-dd") : currentDateString}
@@ -237,6 +268,28 @@ export function LogPage({ onTransactionAdded }: LogPageProps = {}) {
               {errors.date && (
                 <p className="text-sm text-red-500">{errors.date.message as string}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="time" className="text-sm font-medium">Time</Label>
+              <Input
+                id="time"
+                type="time"
+                {...register("time")}
+                defaultValue={format(new Date(), "HH:mm")}
+                className="h-10"
+                onChange={(e) => {
+                  const timeValue = e.target.value;
+                  setValue("time", timeValue);
+                  const dateValue = watch("date");
+                  if (dateValue) {
+                    const [hours, minutes] = timeValue.split(":");
+                    const dateObj = new Date(dateValue);
+                    dateObj.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                    setValue("date", dateObj.toISOString(), { shouldValidate: true });
+                  }
+                }}
+              />
             </div>
 
             <div className="space-y-2">

@@ -15,8 +15,23 @@ export const inviteSchema = z.object({
   email: z.string().email("Invalid email address"),
 });
 
+// Schema for a single income entry
+export const incomeEntrySchema = z.object({
+  monthYear: z.string().regex(/^\d{4}-\d{2}$/, "Invalid month format (YYYY-MM)"),
+  description: z.string().min(1, "Description is required"),
+  amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
+  allocations: z.array(
+    z.object({
+      accountId: z.string().uuid(),
+      amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
+    })
+  ).min(1, "At least one allocation is required"),
+});
+
+// Schema for a single income entry (supports multiple entries per month)
 export const incomeSchema = z.object({
   monthYear: z.string().regex(/^\d{4}-\d{2}$/, "Invalid month format (YYYY-MM)"),
+  description: z.string().optional(), // Optional description (e.g., "Salary", "Freelance", etc.)
   totalAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
   allocations: z.array(
     z.object({
@@ -37,6 +52,7 @@ export const budgetItemSchema = z.object({
 
 export const transactionSchema = z.object({
   date: z.string().datetime(),
+  time: z.string().optional(), // Time field for UI, will be combined with date
   description: z.string().min(1, "Description is required"),
   amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
   categoryId: z.string().uuid(),

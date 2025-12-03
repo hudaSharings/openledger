@@ -4,21 +4,37 @@ import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { incomeSchema } from "@/src/lib/validations";
-import { createIncome, getPaymentAccounts, getIncomeForMonth, updateIncome } from "@/src/lib/actions/financial";
+import { createIncome, getPaymentAccounts, getAllIncomeForMonth, deleteIncome } from "@/src/lib/actions/financial";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { format } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
 
+interface IncomeEntry {
+  income: {
+    id: string;
+    description: string | null;
+    totalAmount: string;
+    createdAt: Date;
+  };
+  allocations: Array<{
+    accountId: string;
+    accountName: string;
+    allocatedAmount: string;
+  }>;
+}
+
 export function SetupPage({ monthYear }: { monthYear: string }) {
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
+  const [incomeEntries, setIncomeEntries] = useState<IncomeEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [existingIncomeId, setExistingIncomeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const {
     register,
@@ -32,6 +48,7 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     resolver: zodResolver(incomeSchema),
     defaultValues: {
       monthYear,
+      description: "",
       totalAmount: "",
       allocations: [{ accountId: "", amount: "" }],
     },
@@ -51,35 +68,15 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     async function loadData() {
       setLoading(true);
       try {
-        const [accs, existingIncome] = await Promise.all([
+        const [accs, allIncome] = await Promise.all([
           getPaymentAccounts(),
-          getIncomeForMonth(monthYear),
+          getAllIncomeForMonth(monthYear),
         ]);
         
         if (!isMounted) return;
         
         setAccounts(accs);
-
-        if (existingIncome) {
-          setExistingIncomeId(existingIncome.income.id);
-          // Pre-populate form with existing income
-          reset({
-            monthYear,
-            totalAmount: existingIncome.income.totalAmount,
-            allocations: existingIncome.allocations.map((alloc) => ({
-              accountId: alloc.accountId,
-              amount: alloc.allocatedAmount,
-            })),
-          });
-        } else {
-          setExistingIncomeId(null);
-          // Reset to default if no existing income
-          reset({
-            monthYear,
-            totalAmount: "",
-            allocations: [{ accountId: "", amount: "" }],
-          });
-        }
+        setIncomeEntries(allIncome);
       } catch (err) {
         console.error("Error loading data:", err);
       } finally {
@@ -101,70 +98,176 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     0
   );
 
+  const totalIncome = incomeEntries.reduce(
+    (sum, entry) => sum + parseFloat(entry.income.totalAmount),
+    0
+  );
+
   const onSubmit = async (data: any) => {
     setError(null);
     setSuccess(false);
     try {
-      let result;
-      if (existingIncomeId) {
-        result = await updateIncome(existingIncomeId, data);
-      } else {
-        result = await createIncome(data);
-      }
+      const result = await createIncome(data);
       if ("error" in result) {
         setError(typeof result.error === "string" ? result.error : "An error occurred");
       } else {
         setSuccess(true);
-        // Reload data to reflect changes and update form
-        const existingIncome = await getIncomeForMonth(monthYear);
-        if (existingIncome) {
-          setExistingIncomeId(existingIncome.income.id);
-          // Reset form with updated data
-          reset({
-            monthYear,
-            totalAmount: existingIncome.income.totalAmount,
-            allocations: existingIncome.allocations.map((alloc) => ({
-              accountId: alloc.accountId,
-              amount: alloc.allocatedAmount,
-            })),
-          });
-        } else {
-          setExistingIncomeId(result.incomeId || null);
-        }
+        // Reload income entries
+        const allIncome = await getAllIncomeForMonth(monthYear);
+        setIncomeEntries(allIncome);
+        // Reset form
+        reset({
+          monthYear,
+          description: "",
+          totalAmount: "",
+          allocations: [{ accountId: "", amount: "" }],
+        });
+        setShowAddForm(false);
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
     }
   };
 
+  const handleDelete = async (incomeId: string) => {
+    if (!confirm("Are you sure you want to delete this income entry?")) {
+      return;
+    }
+
+    try {
+      const result = await deleteIncome(incomeId);
+      if ("error" in result) {
+        setError(typeof result.error === "string" ? result.error : "An error occurred");
+      } else {
+        // Reload income entries
+        const allIncome = await getAllIncomeForMonth(monthYear);
+        setIncomeEntries(allIncome);
+      }
+    } catch (err) {
+      setError("Failed to delete income entry");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">{existingIncomeId ? "Edit Income" : "Setup Income"}</h1>
+        <h1 className="text-3xl font-bold">Income Management</h1>
         <p className="text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
       </div>
 
+      {/* Total Income Summary */}
       <Card>
         <CardHeader>
-          <CardTitle>Monthly Income & Allocation</CardTitle>
-          <CardDescription>
-            Enter your total monthly income and allocate it to payment accounts
-          </CardDescription>
+          <CardTitle>Total Income for {format(new Date(`${monthYear}-01`), "MMMM yyyy")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="totalAmount">Total Monthly Income</Label>
-              <Input
-                id="totalAmount"
-                type="text"
-                placeholder="0.00"
-                {...register("totalAmount")}
-              />
-              {errors.totalAmount && (
-                <p className="text-sm text-red-500">{errors.totalAmount.message as string}</p>
-              )}
+          <div className="text-3xl font-bold text-green-600">₹{totalIncome.toFixed(2)}</div>
+          <p className="text-sm text-gray-600 mt-2">
+            {incomeEntries.length} income {incomeEntries.length === 1 ? "entry" : "entries"}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Existing Income Entries */}
+      {incomeEntries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Income Entries</CardTitle>
+            <CardDescription>All income entries for this month</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Allocations</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {incomeEntries.map((entry) => (
+                    <TableRow key={entry.income.id}>
+                      <TableCell className="font-medium">
+                        {entry.income.description || "Income"}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        ₹{parseFloat(entry.income.totalAmount).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-gray-600">
+                          {entry.allocations.map((alloc, idx) => (
+                            <div key={idx}>
+                              {alloc.accountName}: ₹{parseFloat(alloc.allocatedAmount).toFixed(2)}
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(entry.income.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add New Income Form */}
+      {!showAddForm && (
+        <div className="flex justify-center">
+          <Button onClick={() => setShowAddForm(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Income Entry
+          </Button>
+        </div>
+      )}
+
+      {showAddForm && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Add New Income Entry</CardTitle>
+            <CardDescription>
+              Add a new income source and allocate it to payment accounts
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Input
+                  id="description"
+                  type="text"
+                  placeholder="e.g., Salary, Freelance, Bonus"
+                  {...register("description")}
+                />
+                {errors.description && (
+                  <p className="text-sm text-red-500">{errors.description.message as string}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="totalAmount">Income Amount</Label>
+                <Input
+                  id="totalAmount"
+                  type="text"
+                  placeholder="0.00"
+                  {...register("totalAmount")}
+                />
+                {errors.totalAmount && (
+                  <p className="text-sm text-red-500">{errors.totalAmount.message as string}</p>
+                )}
+              </div>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -241,22 +344,42 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
               </div>
               {Math.abs(totalAllocated - (parseFloat(totalAmount) || 0)) >= 0.01 && (
                 <p className="mt-2 text-sm text-red-500">
-                  Total allocations must equal total income
+                  Total allocations must equal income amount
                 </p>
               )}
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}
             {success && (
-              <p className="text-sm text-green-600">Income setup completed successfully!</p>
+              <p className="text-sm text-green-600">Income entry added successfully!</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting || loading}>
-              {isSubmitting ? "Saving..." : existingIncomeId ? "Update Income" : "Save Income Setup"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowAddForm(false);
+                  reset({
+                    monthYear,
+                    description: "",
+                    totalAmount: "",
+                    allocations: [{ accountId: "", amount: "" }],
+                  });
+                  setError(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isSubmitting || loading}>
+                {isSubmitting ? "Adding..." : "Add Income Entry"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

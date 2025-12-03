@@ -46,6 +46,7 @@ export const incomeEntries = pgTable("income_entries", {
   id: uuid("id").defaultRandom().primaryKey(),
   householdId: uuid("household_id").references(() => households.id, { onDelete: "cascade" }).notNull(),
   monthYear: varchar("month_year", { length: 7 }).notNull(), // Format: "YYYY-MM"
+  description: text("description"), // Optional description for the income source
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

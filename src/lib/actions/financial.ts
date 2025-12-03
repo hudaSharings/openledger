@@ -41,6 +41,7 @@ export async function createIncome(data: z.infer<typeof incomeSchema>) {
       .values({
         householdId,
         monthYear: validated.monthYear,
+        description: validated.description || null,
         totalAmount: validated.totalAmount,
       })
       .returning();
@@ -93,6 +94,82 @@ export async function getIncomeForMonth(monthYear: string) {
   };
 }
 
+// Get all income entries for a month (supports multiple entries)
+export async function getAllIncomeForMonth(monthYear: string) {
+  const householdId = await getHouseholdId();
+
+  const incomeList = await db
+    .select()
+    .from(incomeEntries)
+    .where(
+      and(
+        eq(incomeEntries.householdId, householdId),
+        eq(incomeEntries.monthYear, monthYear)
+      )
+    )
+    .orderBy(desc(incomeEntries.createdAt));
+
+  if (incomeList.length === 0) {
+    return [];
+  }
+
+  // Get allocations for all income entries
+  const incomeIds = incomeList.map((income) => income.id);
+  const allAllocations = incomeIds.length > 0
+    ? await db
+        .select({
+          incomeId: fundAllocations.incomeId,
+          accountId: paymentAccounts.id,
+          accountName: paymentAccounts.name,
+          allocatedAmount: fundAllocations.allocatedAmount,
+        })
+        .from(fundAllocations)
+        .innerJoin(paymentAccounts, eq(fundAllocations.accountId, paymentAccounts.id))
+        .where(inArray(fundAllocations.incomeId, incomeIds))
+    : [];
+
+  // Group allocations by income ID
+  const allocationsByIncome = allAllocations.reduce(
+    (acc, alloc) => {
+      if (!acc[alloc.incomeId]) {
+        acc[alloc.incomeId] = [];
+      }
+      acc[alloc.incomeId].push({
+        accountId: alloc.accountId,
+        accountName: alloc.accountName,
+        allocatedAmount: alloc.allocatedAmount,
+      });
+      return acc;
+    },
+    {} as Record<string, Array<{ accountId: string; accountName: string; allocatedAmount: string }>>
+  );
+
+  return incomeList.map((income) => ({
+    income,
+    allocations: allocationsByIncome[income.id] || [],
+  }));
+}
+
+export async function deleteIncome(incomeId: string) {
+  const householdId = await getHouseholdId();
+
+  // Verify the income belongs to the household
+  const [existing] = await db
+    .select()
+    .from(incomeEntries)
+    .where(and(eq(incomeEntries.id, incomeId), eq(incomeEntries.householdId, householdId)))
+    .limit(1);
+
+  if (!existing) {
+    return { error: "Income entry not found or unauthorized" };
+  }
+
+  // Delete will cascade to fund allocations
+  await db.delete(incomeEntries).where(eq(incomeEntries.id, incomeId));
+
+  return { success: true };
+}
+
 export async function updateIncome(incomeId: string, data: z.infer<typeof incomeSchema>) {
   const householdId = await getHouseholdId();
   const validated = incomeSchema.parse(data);
@@ -122,6 +199,7 @@ export async function updateIncome(incomeId: string, data: z.infer<typeof income
     const [income] = await tx
       .update(incomeEntries)
       .set({
+        description: validated.description || null,
         totalAmount: validated.totalAmount,
       })
       .where(eq(incomeEntries.id, incomeId))
