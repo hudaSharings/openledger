@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { LoadingSpinner } from "./ui/loading-spinner";
 import {
   Dialog,
   DialogContent,
