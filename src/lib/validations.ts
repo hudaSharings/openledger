@@ -66,3 +66,34 @@ export const categorySchema = z.object({
   type: z.enum(["mandatory", "periodic", "ad_hoc"]),
 });
 
+// Schema for credit entries (similar to income entries)
+export const creditEntrySchema = z.object({
+  monthYear: z.string().regex(/^\d{4}-\d{2}$/, "Invalid month format (YYYY-MM)"),
+  description: z.string().min(1, "Description is required"),
+  totalAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
+  notes: z.string().optional(),
+});
+
+export const creditSchema = z.object({
+  monthYear: z.string().regex(/^\d{4}-\d{2}$/, "Invalid month format (YYYY-MM)"),
+  description: z.string().optional(),
+  totalAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
+  notes: z.string().optional(),
+});
+
+export const paymentAccountSchema = z.object({
+  name: z.string().min(1, "Account name is required").max(255, "Account name is too long"),
+});
+
+export const reminderSchema = z.object({
+  budgetItemId: z.string().uuid().optional(),
+  description: z.string().min(1, "Description is required"),
+  amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
+  reminderDate: z.string().datetime(), // ISO datetime string - Due date
+  daysBeforeDueDate: z.number().int().min(0).max(365).default(7), // Start reminding X days before due date
+  reminderIntervalDays: z.number().int().min(1).max(30).default(1), // Send reminder every Y days
+  isRecurring: z.boolean().default(false),
+  recurringPattern: z.enum(["daily", "weekly", "monthly", "yearly"]).optional(),
+  isActive: z.boolean().default(true),
+});
+

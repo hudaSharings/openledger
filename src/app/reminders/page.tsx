@@ -1,23 +1,21 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/src/lib/get-session";
-import { Dashboard } from "@/src/components/dashboard";
+import { RemindersPage } from "@/src/components/reminders-page";
 import { Navbar } from "@/src/components/navbar";
 import { MainContentWrapper } from "@/src/components/main-content-wrapper";
 
-export default async function HomePage() {
+export default async function RemindersRoute() {
   const session = await getServerSession();
 
   if (!session) {
     redirect("/login");
   }
 
-  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <MainContentWrapper>
-        <Dashboard monthYear={currentMonth} />
+        <RemindersPage />
       </MainContentWrapper>
     </div>
   );

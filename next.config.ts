@@ -23,8 +23,6 @@ export default withPWA({
   disable: process.env.NODE_ENV === "development", // Disable only in development
   buildExcludes: [/middleware-manifest\.json$/],
   publicExcludes: ["!noprecache/**/*"],
-
-
   runtimeCaching: [
     {
       urlPattern: /^https?.*/,

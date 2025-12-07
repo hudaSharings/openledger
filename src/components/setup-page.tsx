@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { incomeSchema } from "@/src/lib/validations";
-import { createIncome, getPaymentAccounts, getAllIncomeForMonth, deleteIncome } from "@/src/lib/actions/financial";
+import { incomeSchema, creditSchema } from "@/src/lib/validations";
+import { createIncome, getPaymentAccounts, getAllIncomeForMonth, deleteIncome, createCredit, getAllCreditsForMonth, deleteCredit } from "@/src/lib/actions/financial";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { format } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
 import { LoadingSpinner, LoadingOverlay } from "./ui/loading-spinner";
@@ -29,13 +31,24 @@ interface IncomeEntry {
   }>;
 }
 
+interface CreditEntry {
+  id: string;
+  description: string | null;
+  totalAmount: string;
+  notes: string | null;
+  createdAt: Date;
+}
+
 export function SetupPage({ monthYear }: { monthYear: string }) {
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
   const [incomeEntries, setIncomeEntries] = useState<IncomeEntry[]>([]);
+  const [creditEntries, setCreditEntries] = useState<CreditEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddCreditForm, setShowAddCreditForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<"income" | "credits">("income");
 
   const {
     register,
@@ -55,6 +68,21 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     },
   });
 
+  const {
+    register: registerCredit,
+    handleSubmit: handleSubmitCredit,
+    reset: resetCredit,
+    formState: { errors: creditErrors, isSubmitting: isSubmittingCredit },
+  } = useForm({
+    resolver: zodResolver(creditSchema),
+    defaultValues: {
+      monthYear,
+      description: "",
+      totalAmount: "",
+      notes: "",
+    },
+  });
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: "allocations",
@@ -69,15 +97,17 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     async function loadData() {
       setLoading(true);
       try {
-        const [accs, allIncome] = await Promise.all([
+        const [accs, allIncome, allCredits] = await Promise.all([
           getPaymentAccounts(),
           getAllIncomeForMonth(monthYear),
+          getAllCreditsForMonth(monthYear),
         ]);
         
         if (!isMounted) return;
         
         setAccounts(accs);
         setIncomeEntries(allIncome);
+        setCreditEntries(allCredits);
       } catch (err) {
         console.error("Error loading data:", err);
       } finally {
@@ -149,6 +179,51 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     }
   };
 
+  const onSubmitCredit = async (data: any) => {
+    setError(null);
+    setSuccess(false);
+    try {
+      const result = await createCredit(data);
+      if ("error" in result) {
+        setError(typeof result.error === "string" ? result.error : "An error occurred");
+      } else {
+        setSuccess(true);
+        // Reload credit entries
+        const allCredits = await getAllCreditsForMonth(monthYear);
+        setCreditEntries(allCredits);
+        // Reset form
+        resetCredit({
+          monthYear,
+          description: "",
+          totalAmount: "",
+          notes: "",
+        });
+        setShowAddCreditForm(false);
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again.");
+    }
+  };
+
+  const handleDeleteCredit = async (creditId: string) => {
+    if (!confirm("Are you sure you want to delete this credit entry?")) {
+      return;
+    }
+
+    try {
+      const result = await deleteCredit(creditId);
+      if ("error" in result) {
+        setError(typeof result.error === "string" ? result.error : "An error occurred");
+      } else {
+        // Reload credit entries
+        const allCredits = await getAllCreditsForMonth(monthYear);
+        setCreditEntries(allCredits);
+      }
+    } catch (err) {
+      setError("Failed to delete credit entry");
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -168,13 +243,25 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
     );
   }
 
+  const totalCredits = creditEntries.reduce(
+    (sum, entry) => sum + parseFloat(entry.totalAmount),
+    0
+  );
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Income Management</h1>
+        <h1 className="text-3xl font-bold">Income & Credits Management</h1>
         <p className="text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
       </div>
 
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "income" | "credits")}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="income">Income</TabsTrigger>
+          <TabsTrigger value="credits">Credits</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="income" className="space-y-6">
       {/* Total Income Summary */}
       <Card>
         <CardHeader>
@@ -407,6 +494,176 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
         </CardContent>
       </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="credits" className="space-y-6">
+          {/* Total Credits Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Credits for {format(new Date(`${monthYear}-01`), "MMMM yyyy")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-600">₹{totalCredits.toFixed(2)}</div>
+              <p className="text-sm text-gray-600 mt-2">
+                {creditEntries.length} credit {creditEntries.length === 1 ? "entry" : "entries"}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Existing Credit Entries */}
+          {creditEntries.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Credit Entries</CardTitle>
+                <CardDescription>All credit entries for this month</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {creditEntries.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell className="font-medium">
+                            {entry.description || "Credit"}
+                          </TableCell>
+                          <TableCell className="text-gray-600 text-sm max-w-xs">
+                            {entry.notes ? (
+                              <span className="truncate block" title={entry.notes}>
+                                {entry.notes}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-bold">
+                            ₹{parseFloat(entry.totalAmount).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteCredit(entry.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Add New Credit Form */}
+          {!showAddCreditForm && (
+            <div className="flex justify-center">
+              <Button onClick={() => setShowAddCreditForm(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Credit Entry
+              </Button>
+            </div>
+          )}
+
+          {showAddCreditForm && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Add New Credit Entry</CardTitle>
+                <CardDescription>
+                  Add a new credit entry (e.g., borrowed money, credit card usage)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmitCredit(onSubmitCredit)} className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="credit-description">Description</Label>
+                    <Input
+                      id="credit-description"
+                      type="text"
+                      placeholder="e.g., Borrowed from friend, Credit Card"
+                      {...registerCredit("description")}
+                    />
+                    {creditErrors.description && (
+                      <p className="text-sm text-red-500">{creditErrors.description.message as string}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="credit-totalAmount">Credit Amount</Label>
+                    <Input
+                      id="credit-totalAmount"
+                      type="text"
+                      placeholder="0.00"
+                      {...registerCredit("totalAmount")}
+                    />
+                    {creditErrors.totalAmount && (
+                      <p className="text-sm text-red-500">{creditErrors.totalAmount.message as string}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="credit-notes">Notes (Optional)</Label>
+                    <Textarea
+                      id="credit-notes"
+                      placeholder="Add any additional notes about this credit entry..."
+                      rows={3}
+                      {...registerCredit("notes")}
+                    />
+                    {creditErrors.notes && (
+                      <p className="text-sm text-red-500">{creditErrors.notes.message as string}</p>
+                    )}
+                  </div>
+
+                  {error && <p className="text-sm text-red-500">{error}</p>}
+                  {success && (
+                    <p className="text-sm text-green-600">Credit entry added successfully!</p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowAddCreditForm(false);
+                        resetCredit({
+                          monthYear,
+                          description: "",
+                          totalAmount: "",
+                          notes: "",
+                        });
+                        setError(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="flex-1" disabled={isSubmittingCredit || loading}>
+                      {isSubmittingCredit ? (
+                        <span className="flex items-center gap-2">
+                          <LoadingSpinner size="sm" className="border-white" />
+                          Adding...
+                        </span>
+                      ) : (
+                        "Add Credit Entry"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

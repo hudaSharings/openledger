@@ -90,7 +90,7 @@ export function TemplatesPage() {
         setCategories(cats);
         setAccounts(accs);
       } catch (err) {
-        setError("Failed to load templates");
+        setError("Failed to load recurring items");
       } finally {
         setLoading(false);
       }
@@ -174,12 +174,12 @@ export function TemplatesPage() {
         }
       }
     } catch (err: any) {
-      setError(err.message || "Failed to save template");
+      setError(err.message || "Failed to save recurring item");
     }
   };
 
   const handleDelete = async (templateId: string) => {
-    if (!confirm("Are you sure you want to delete this template?")) {
+    if (!confirm("Are you sure you want to delete this recurring item?")) {
       return;
     }
 
@@ -190,7 +190,7 @@ export function TemplatesPage() {
       setTemplates(temps);
       setFilteredTemplates(temps);
     } catch (err) {
-      setError("Failed to delete template");
+      setError("Failed to delete recurring item");
     }
   };
 
@@ -219,28 +219,28 @@ export function TemplatesPage() {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading templates...</div>;
+    return <div className="text-center py-8">Loading recurring items...</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Expense Templates</h1>
-          <p className="text-gray-600">Manage reusable expense templates for quick budget planning</p>
+          <h1 className="text-3xl font-bold">Recurring Items</h1>
+          <p className="text-gray-600">Manage frequently used expense items for quick budget planning</p>
         </div>
         <Dialog open={addDialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700 shadow-md">
               <Plus className="h-4 w-4 mr-2" />
-              Add Template
+              Add Recurring Item
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-xl">Add Expense Template</DialogTitle>
+              <DialogTitle className="text-xl">Add Recurring Item</DialogTitle>
               <DialogDescription>
-                Create a reusable template for common expenses
+                Create a frequently used expense item for quick budget planning
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
@@ -322,7 +322,7 @@ export function TemplatesPage() {
               )}
               {success && (
                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-600 font-medium">✓ Template {editingTemplate ? "updated" : "created"} successfully!</p>
+                  <p className="text-sm text-green-600 font-medium">✓ Recurring item {editingTemplate ? "updated" : "created"} successfully!</p>
                 </div>
               )}
 
@@ -350,7 +350,7 @@ export function TemplatesPage() {
                       {editingTemplate ? "Saving..." : "Creating..."}
                     </span>
                   ) : (
-                    editingTemplate ? "Save Changes" : "Create Template"
+                    editingTemplate ? "Save Changes" : "Create Recurring Item"
                   )}
                 </Button>
               </div>
@@ -366,7 +366,7 @@ export function TemplatesPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search templates..."
+                placeholder="Search recurring items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -379,15 +379,15 @@ export function TemplatesPage() {
       {/* Templates Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Templates ({filteredTemplates.length})</CardTitle>
-          <CardDescription>All your expense templates</CardDescription>
+          <CardTitle>Recurring Items ({filteredTemplates.length})</CardTitle>
+          <CardDescription>All your frequently used expense items</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredTemplates.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-600">No templates found.</p>
+              <p className="text-gray-600">No recurring items found.</p>
               <p className="text-gray-500 text-sm mt-2">
-                {searchQuery ? "Try a different search term." : "Create your first template above."}
+                {searchQuery ? "Try a different search term." : "Create your first recurring item above."}
               </p>
             </div>
           ) : (
@@ -439,7 +439,7 @@ export function TemplatesPage() {
                             size="sm"
                             onClick={() => handleEdit(template)}
                             className="h-8 w-8 p-0 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={template.inUse ? "Cannot edit: Template is in use" : "Edit"}
+                            title={template.inUse ? "Cannot edit: Recurring item is in use" : "Edit"}
                             disabled={template.inUse}
                           >
                             <Pencil className="h-4 w-4 text-blue-600" />
@@ -449,7 +449,7 @@ export function TemplatesPage() {
                             size="sm"
                             onClick={() => handleDelete(template.id)}
                             className="h-8 w-8 p-0 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={template.inUse ? "Cannot delete: Template is in use" : "Delete"}
+                            title={template.inUse ? "Cannot delete: Recurring item is in use" : "Delete"}
                             disabled={template.inUse}
                           >
                             <Trash2 className="h-4 w-4 text-red-600" />
@@ -469,9 +469,9 @@ export function TemplatesPage() {
       <Dialog open={editDialogOpen} onOpenChange={handleEditDialogOpenChange}>
         <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">Edit Expense Template</DialogTitle>
+            <DialogTitle className="text-xl">Edit Recurring Item</DialogTitle>
             <DialogDescription>
-              Update the template details
+              Update the recurring item details
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">

@@ -19,8 +19,8 @@ export async function Dashboard({ monthYear }: { monthYear: string }) {
     Actual: parseFloat(item.actual.toString()),
   }));
 
-  // Calculate net cash flow
-  const netCashFlow = (data.income || 0) - data.totalActual;
+  // Calculate net cash flow (using total inward instead of just income)
+  const netCashFlow = (data.totalInward || 0) - data.totalActual;
 
   return (
     <div className="space-y-6">
@@ -54,61 +54,109 @@ export async function Dashboard({ monthYear }: { monthYear: string }) {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-            {isAdmin && (
-              <Link href={`/setup/${monthYear}`}>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Add/Edit Income">
-                  <IndianRupee className="h-4 w-4" />
-                </Button>
-              </Link>
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{(data.income || 0).toFixed(2)}</div>
-            {isAdmin && (data.income === 0 || !data.income) && (
-              <Link href={`/setup/${monthYear}`} className="mt-2 inline-block">
-                <Button variant="link" size="sm" className="h-auto p-0 text-xs text-blue-600">
-                  Add Income
-                </Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
+      {/* Income Section */}
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-gray-700">Income & Credits</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+              {isAdmin && (
+                <Link href={`/setup/${monthYear}`}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Add/Edit Income">
+                    <IndianRupee className="h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₹{(data.income || 0).toFixed(2)}</div>
+              {isAdmin && (data.income === 0 || !data.income) && (
+                <Link href={`/setup/${monthYear}`} className="mt-2 inline-block">
+                  <Button variant="link" size="sm" className="h-auto p-0 text-xs text-blue-600">
+                    Add Income
+                  </Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Planned</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{(data.totalPlanned || 0).toFixed(2)}</div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Credits</CardTitle>
+              {isAdmin && (
+                <Link href={`/setup/${monthYear}`}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Add/Edit Credits">
+                    <IndianRupee className="h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₹{(data.credits || 0).toFixed(2)}</div>
+              {isAdmin && (data.credits === 0 || !data.credits) && (
+                <Link href={`/setup/${monthYear}`} className="mt-2 inline-block">
+                  <Button variant="link" size="sm" className="h-auto p-0 text-xs text-blue-600">
+                    Add Credits
+                  </Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Actual</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{(data.totalActual || 0).toFixed(2)}</div>
-            <p className="text-xs text-gray-600">
-              Planned: ₹{(data.totalPlannedActual || 0).toFixed(2)} | Unplanned: ₹{(data.totalUnplannedActual || 0).toFixed(2)}
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Inward</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">₹{(data.totalInward || 0).toFixed(2)}</div>
+              <p className="text-xs text-gray-600 mt-1">
+                Income + Credits
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Cash Flow</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${netCashFlow >= 0 ? "text-green-600" : "text-red-600"}`}>
-              ₹{netCashFlow.toFixed(2)}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Expenses Section */}
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-gray-700">Expenses & Cash Flow</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Planned</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₹{(data.totalPlanned || 0).toFixed(2)}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Actual</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">₹{(data.totalActual || 0).toFixed(2)}</div>
+              <p className="text-xs text-gray-600 mt-1">
+                Planned: ₹{(data.totalPlannedActual || 0).toFixed(2)} | Unplanned: ₹{(data.totalUnplannedActual || 0).toFixed(2)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Net Cash Flow</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${netCashFlow >= 0 ? "text-green-600" : "text-red-600"}`}>
+                ₹{netCashFlow.toFixed(2)}
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Inward - Actual
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

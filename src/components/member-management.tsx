@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { getHouseholdMembers, updateUserRole } from "@/src/lib/actions/auth";
 import { useSession } from "next-auth/react";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Users, Shield, User } from "lucide-react";
 import { format } from "date-fns";
@@ -60,29 +59,15 @@ export function MemberManagement() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center gap-3 py-8">
-          <LoadingSpinner size="lg" />
-          <p className="text-sm text-gray-600">Loading members...</p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center gap-3 py-8">
+        <LoadingSpinner size="lg" />
+        <p className="text-sm text-gray-600">Loading members...</p>
+      </div>
     );
   }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-blue-100 p-2">
-            <Users className="h-5 w-5 text-blue-600" />
-          </div>
-          <div>
-            <CardTitle>Household Members</CardTitle>
-            <CardDescription>Manage member roles and permissions</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
+    <div>
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
             <p className="text-sm text-red-600">{error}</p>
@@ -168,8 +153,7 @@ export function MemberManagement() {
             <strong>Member:</strong> Can view dashboard and add transaction logs
           </p>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "@/src/lib/get-session";
 import { TemplatesPage } from "@/src/components/templates-page";
 import { Navbar } from "@/src/components/navbar";
+import { MainContentWrapper } from "@/src/components/main-content-wrapper";
 
 export default async function TemplatesPageRoute() {
   const session = await getServerSession();
@@ -10,7 +11,7 @@ export default async function TemplatesPageRoute() {
     redirect("/login");
   }
 
-  // Only admins can access templates
+  // Only admins can access recurring items
   if (session.user.role !== "admin") {
     redirect("/");
   }
@@ -18,9 +19,9 @@ export default async function TemplatesPageRoute() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <MainContentWrapper>
         <TemplatesPage />
-      </main>
+      </MainContentWrapper>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
+import { SidebarProvider } from "./sidebar-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -8,7 +9,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       refetchInterval={0}
       refetchOnWindowFocus={false}
     >
-      {children}
+      <SidebarProvider>{children}</SidebarProvider>
     </SessionProvider>
   );
 }

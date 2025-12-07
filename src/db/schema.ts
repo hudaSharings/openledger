@@ -51,6 +51,17 @@ export const incomeEntries = pgTable("income_entries", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Credit entries table (for tracking borrowed money, credit card usage, etc.)
+export const creditEntries = pgTable("credit_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  householdId: uuid("household_id").references(() => households.id, { onDelete: "cascade" }).notNull(),
+  monthYear: varchar("month_year", { length: 7 }).notNull(), // Format: "YYYY-MM"
+  description: text("description"), // Description of the credit source (e.g., "Borrowed from friend", "Credit Card")
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  notes: text("notes"), // Optional notes for additional information
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Fund allocations table
 export const fundAllocations = pgTable("fund_allocations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -96,7 +107,7 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Expense templates table (reusable expense items)
+// Expense templates table (recurring/frequently used expense items)
 export const expenseTemplates = pgTable("expense_templates", {
   id: uuid("id").defaultRandom().primaryKey(),
   householdId: uuid("household_id").references(() => households.id, { onDelete: "cascade" }).notNull(),
@@ -108,23 +119,55 @@ export const expenseTemplates = pgTable("expense_templates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Push subscriptions table (for web push notifications)
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Payment reminders table
+export const paymentReminders = pgTable("payment_reminders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  householdId: uuid("household_id").references(() => households.id, { onDelete: "cascade" }).notNull(),
+  budgetItemId: uuid("budget_item_id").references(() => budgetItems.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  reminderDate: timestamp("reminder_date").notNull(), // Due date - when the payment is due
+  daysBeforeDueDate: decimal("days_before_due_date", { precision: 3, scale: 0 }).default("7").notNull(), // Start reminding X days before due date
+  reminderIntervalDays: decimal("reminder_interval_days", { precision: 3, scale: 0 }).default("1").notNull(), // Send reminder every Y days
+  isRecurring: boolean("is_recurring").default(false).notNull(),
+  recurringPattern: varchar("recurring_pattern", { length: 50 }), // "monthly", "weekly", "daily", etc.
+  isActive: boolean("is_active").default(true).notNull(),
+  lastNotifiedDate: timestamp("last_notified_date"), // Track when the last notification was sent
+  notified: boolean("notified").default(false).notNull(), // Track if any notification was sent
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const householdsRelations = relations(households, ({ many }) => ({
   users: many(users),
   paymentAccounts: many(paymentAccounts),
   incomeEntries: many(incomeEntries),
+  creditEntries: many(creditEntries),
   categories: many(categories),
   budgetItems: many(budgetItems),
   transactions: many(transactions),
   inviteTokens: many(inviteTokens),
   expenseTemplates: many(expenseTemplates),
+  paymentReminders: many(paymentReminders),
 }));
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   household: one(households, {
     fields: [users.householdId],
     references: [households.id],
   }),
+  pushSubscriptions: many(pushSubscriptions),
 }));
 
 export const inviteTokensRelations = relations(inviteTokens, ({ one }) => ({
@@ -150,6 +193,13 @@ export const incomeEntriesRelations = relations(incomeEntries, ({ one, many }) =
     references: [households.id],
   }),
   fundAllocations: many(fundAllocations),
+}));
+
+export const creditEntriesRelations = relations(creditEntries, ({ one }) => ({
+  household: one(households, {
+    fields: [creditEntries.householdId],
+    references: [households.id],
+  }),
 }));
 
 export const fundAllocationsRelations = relations(fundAllocations, ({ one }) => ({
@@ -219,6 +269,24 @@ export const expenseTemplatesRelations = relations(expenseTemplates, ({ one }) =
   account: one(paymentAccounts, {
     fields: [expenseTemplates.accountId],
     references: [paymentAccounts.id],
+  }),
+}));
+
+export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [pushSubscriptions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const paymentRemindersRelations = relations(paymentReminders, ({ one }) => ({
+  household: one(households, {
+    fields: [paymentReminders.householdId],
+    references: [households.id],
+  }),
+  budgetItem: one(budgetItems, {
+    fields: [paymentReminders.budgetItemId],
+    references: [budgetItems.id],
   }),
 }));
 

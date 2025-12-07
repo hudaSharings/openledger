@@ -3,14 +3,16 @@
 import { db } from "@/src/db";
 import {
   incomeEntries,
+  creditEntries,
   fundAllocations,
   budgetItems,
   transactions,
   categories,
   paymentAccounts,
+  expenseTemplates,
 } from "@/src/db/schema";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
-import { incomeSchema, budgetItemSchema, transactionSchema } from "@/src/lib/validations";
+import { incomeSchema, creditSchema, budgetItemSchema, transactionSchema } from "@/src/lib/validations";
 import { z } from "zod";
 import { getServerSession } from "@/src/lib/get-session";
 
@@ -223,6 +225,89 @@ export async function updateIncome(incomeId: string, data: z.infer<typeof income
   return { success: true, incomeId: result.id };
 }
 
+// Credit entries functions
+export async function createCredit(data: z.infer<typeof creditSchema>) {
+  const householdId = await getHouseholdId();
+  const validated = creditSchema.parse(data);
+
+  const [credit] = await db
+    .insert(creditEntries)
+    .values({
+      householdId,
+      monthYear: validated.monthYear,
+      description: validated.description || null,
+      totalAmount: validated.totalAmount,
+      notes: validated.notes || null,
+    })
+    .returning();
+
+  return { success: true, creditId: credit.id };
+}
+
+export async function getAllCreditsForMonth(monthYear: string) {
+  const householdId = await getHouseholdId();
+
+  const credits = await db
+    .select()
+    .from(creditEntries)
+    .where(
+      and(
+        eq(creditEntries.householdId, householdId),
+        eq(creditEntries.monthYear, monthYear)
+      )
+    )
+    .orderBy(desc(creditEntries.createdAt));
+
+  return credits;
+}
+
+export async function updateCredit(creditId: string, data: z.infer<typeof creditSchema>) {
+  const householdId = await getHouseholdId();
+  const validated = creditSchema.parse(data);
+
+  // Verify the credit belongs to the household
+  const [existing] = await db
+    .select()
+    .from(creditEntries)
+    .where(and(eq(creditEntries.id, creditId), eq(creditEntries.householdId, householdId)))
+    .limit(1);
+
+  if (!existing) {
+    return { error: "Credit entry not found" };
+  }
+
+  const [credit] = await db
+    .update(creditEntries)
+    .set({
+      description: validated.description || null,
+      totalAmount: validated.totalAmount,
+      notes: validated.notes || null,
+    })
+    .where(eq(creditEntries.id, creditId))
+    .returning();
+
+  return { success: true, creditId: credit.id };
+}
+
+export async function deleteCredit(creditId: string) {
+  const householdId = await getHouseholdId();
+
+  // Verify the credit belongs to the household
+  const [existing] = await db
+    .select()
+    .from(creditEntries)
+    .where(and(eq(creditEntries.id, creditId), eq(creditEntries.householdId, householdId)))
+    .limit(1);
+
+  if (!existing) {
+    return { error: "Credit entry not found or unauthorized" };
+  }
+
+  await db.delete(creditEntries).where(eq(creditEntries.id, creditId));
+
+  return { success: true };
+}
+
 export async function createBudgetItem(data: z.infer<typeof budgetItemSchema>) {
   const householdId = await getHouseholdId();
   const validated = budgetItemSchema.parse(data);
@@ -342,6 +427,26 @@ export async function getDashboardData(monthYear: string) {
     (sum, entry) => sum + parseFloat(entry.totalAmount),
     0
   );
+
+  // Get all credit entries for the month
+  const creditEntriesList = await db
+    .select()
+    .from(creditEntries)
+    .where(
+      and(
+        eq(creditEntries.householdId, householdId),
+        eq(creditEntries.monthYear, monthYear)
+      )
+    );
+
+  // Sum all credit entries for the month
+  const totalCredits = creditEntriesList.reduce(
+    (sum, entry) => sum + parseFloat(entry.totalAmount),
+    0
+  );
+
+  // Calculate total inward (income + credits)
+  const totalInward = totalIncome + totalCredits;
 
   // Get all income IDs for the month
   const incomeIds = incomeEntriesList.map((entry) => entry.id);
@@ -539,6 +644,8 @@ export async function getDashboardData(monthYear: string) {
 
   return {
     income: totalIncome,
+    credits: totalCredits,
+    totalInward: totalInward,
     totalPlanned,
     totalActual,
     totalPlannedActual,
@@ -572,6 +679,211 @@ export async function getPaymentAccounts() {
     .orderBy(paymentAccounts.name);
 
   return accounts;
+}
+
+export async function createPaymentAccount(name: string) {
+  const householdId = await getHouseholdId();
+
+  // Check if account with same name already exists
+  const existing = await db
+    .select()
+    .from(paymentAccounts)
+    .where(
+      and(
+        eq(paymentAccounts.householdId, householdId),
+        eq(paymentAccounts.name, name.trim())
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return { error: "An account with this name already exists" };
+  }
+
+  const [account] = await db
+    .insert(paymentAccounts)
+    .values({
+      householdId,
+      name: name.trim(),
+    })
+    .returning();
+
+  return { success: true, accountId: account.id };
+}
+
+export async function updatePaymentAccount(accountId: string, name: string) {
+  const householdId = await getHouseholdId();
+
+  // Verify the account belongs to the household
+  const [existing] = await db
+    .select()
+    .from(paymentAccounts)
+    .where(and(eq(paymentAccounts.id, accountId), eq(paymentAccounts.householdId, householdId)))
+    .limit(1);
+
+  if (!existing) {
+    return { error: "Account not found or unauthorized" };
+  }
+
+  // Check if another account with same name already exists
+  const duplicate = await db
+    .select()
+    .from(paymentAccounts)
+    .where(
+      and(
+        eq(paymentAccounts.householdId, householdId),
+        eq(paymentAccounts.name, name.trim()),
+        sql`${paymentAccounts.id} != ${accountId}`
+      )
+    )
+    .limit(1);
+
+  if (duplicate.length > 0) {
+    return { error: "An account with this name already exists" };
+  }
+
+  await db
+    .update(paymentAccounts)
+    .set({ name: name.trim() })
+    .where(eq(paymentAccounts.id, accountId));
+
+  return { success: true };
+}
+
+export async function deletePaymentAccount(accountId: string) {
+  const householdId = await getHouseholdId();
+
+  // Verify the account belongs to the household
+  const [existing] = await db
+    .select()
+    .from(paymentAccounts)
+    .where(and(eq(paymentAccounts.id, accountId), eq(paymentAccounts.householdId, householdId)))
+    .limit(1);
+
+  if (!existing) {
+    return { error: "Account not found or unauthorized" };
+  }
+
+  // Check if account is in use
+  const [inFundAllocations] = await db
+    .select()
+    .from(fundAllocations)
+    .innerJoin(incomeEntries, eq(fundAllocations.incomeId, incomeEntries.id))
+    .where(
+      and(
+        eq(fundAllocations.accountId, accountId),
+        eq(incomeEntries.householdId, householdId)
+      )
+    )
+    .limit(1);
+
+  const [inBudgetItems] = await db
+    .select()
+    .from(budgetItems)
+    .where(
+      and(
+        eq(budgetItems.allocatedToAccountId, accountId),
+        eq(budgetItems.householdId, householdId)
+      )
+    )
+    .limit(1);
+
+  const [inTransactions] = await db
+    .select()
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.paidFromAccountId, accountId),
+        eq(transactions.householdId, householdId)
+      )
+    )
+    .limit(1);
+
+  const [inTemplates] = await db
+    .select()
+    .from(expenseTemplates)
+    .where(
+      and(
+        eq(expenseTemplates.accountId, accountId),
+        eq(expenseTemplates.householdId, householdId)
+      )
+    )
+    .limit(1);
+
+  if (inFundAllocations || inBudgetItems || inTransactions || inTemplates) {
+    return { error: "Cannot delete account: It is being used in income allocations, budget items, transactions, or recurring items" };
+  }
+
+  await db.delete(paymentAccounts).where(eq(paymentAccounts.id, accountId));
+
+  return { success: true };
+}
+
+export async function getPaymentAccountsWithUsage() {
+  const householdId = await getHouseholdId();
+
+  const accounts = await db
+    .select()
+    .from(paymentAccounts)
+    .where(eq(paymentAccounts.householdId, householdId))
+    .orderBy(paymentAccounts.name);
+
+  // Check usage for each account
+  const accountsWithUsage = await Promise.all(
+    accounts.map(async (account) => {
+      const [inFundAllocations] = await db
+        .select()
+        .from(fundAllocations)
+        .innerJoin(incomeEntries, eq(fundAllocations.incomeId, incomeEntries.id))
+        .where(
+          and(
+            eq(fundAllocations.accountId, account.id),
+            eq(incomeEntries.householdId, householdId)
+          )
+        )
+        .limit(1);
+
+      const [inBudgetItems] = await db
+        .select()
+        .from(budgetItems)
+        .where(
+          and(
+            eq(budgetItems.allocatedToAccountId, account.id),
+            eq(budgetItems.householdId, householdId)
+          )
+        )
+        .limit(1);
+
+      const [inTransactions] = await db
+        .select()
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.paidFromAccountId, account.id),
+            eq(transactions.householdId, householdId)
+          )
+        )
+        .limit(1);
+
+      const [inTemplates] = await db
+        .select()
+        .from(expenseTemplates)
+        .where(
+          and(
+            eq(expenseTemplates.accountId, account.id),
+            eq(expenseTemplates.householdId, householdId)
+          )
+        )
+        .limit(1);
+
+      return {
+        ...account,
+        inUse: !!(inFundAllocations || inBudgetItems || inTransactions || inTemplates),
+      };
+    })
+  );
+
+  return accountsWithUsage;
 }
 
 export async function getBudgetItems(monthYear: string) {

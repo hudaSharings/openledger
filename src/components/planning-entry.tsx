@@ -217,7 +217,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
 
   const handleSaveAsTemplate = async () => {
     if (!description || !categoryId || !accountId) {
-      setError("Please fill in description, category, and account to save as template");
+      setError("Please fill in description, category, and account to save as recurring item");
       return;
     }
 
@@ -236,7 +236,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      setError("Failed to save template");
+      setError("Failed to save recurring item");
     }
   };
 
@@ -481,7 +481,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                         className="h-7 text-xs gap-1"
                       >
                         <Search className="h-3 w-3" />
-                        Templates
+                        Recurring Items
                       </Button>
                       {description && categoryId && accountId && (
                         <Button
@@ -492,7 +492,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                           className="h-7 text-xs gap-1"
                         >
                           <Save className="h-3 w-3" />
-                          Save Template
+                          Save as Recurring Item
                         </Button>
                       )}
                     </div>
@@ -501,7 +501,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                     <div className="border rounded-md p-2 bg-gray-50 space-y-2">
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Search templates..."
+                          placeholder="Search recurring items..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="h-8 text-sm"
@@ -518,7 +518,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                       </div>
                       <div className="max-h-40 overflow-y-auto space-y-1">
                         {filteredTemplates.length === 0 ? (
-                          <p className="text-xs text-gray-500 p-2">No templates found</p>
+                          <p className="text-xs text-gray-500 p-2">No recurring items found</p>
                         ) : (
                           filteredTemplates.map((template) => (
                             <button
@@ -707,7 +707,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                         className="h-7 text-xs gap-1"
                       >
                         <Search className="h-3 w-3" />
-                        Templates
+                        Recurring Items
                       </Button>
                       {description && categoryId && accountId && (
                         <Button
@@ -718,7 +718,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                           className="h-7 text-xs gap-1"
                         >
                           <Save className="h-3 w-3" />
-                          Save Template
+                          Save as Recurring Item
                         </Button>
                       )}
                     </div>
@@ -727,7 +727,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                     <div className="border rounded-md p-2 bg-gray-50 space-y-2">
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Search templates..."
+                          placeholder="Search recurring items..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="h-8 text-sm"
@@ -744,7 +744,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
                       </div>
                       <div className="max-h-40 overflow-y-auto space-y-1">
                         {filteredTemplates.length === 0 ? (
-                          <p className="text-xs text-gray-500 p-2">No templates found</p>
+                          <p className="text-xs text-gray-500 p-2">No recurring items found</p>
                         ) : (
                           filteredTemplates.map((template) => (
                             <button
