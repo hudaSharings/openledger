@@ -13,9 +13,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { format } from "date-fns";
-import { Plus, Trash2 } from "lucide-react";
+import { format, subMonths, addMonths, parse } from "date-fns";
+import { Plus, Trash2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { LoadingSpinner, LoadingOverlay } from "./ui/loading-spinner";
+import { useRouter } from "next/navigation";
 
 interface IncomeEntry {
   income: {
@@ -40,6 +41,7 @@ interface CreditEntry {
 }
 
 export function SetupPage({ monthYear }: { monthYear: string }) {
+  const router = useRouter();
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
   const [incomeEntries, setIncomeEntries] = useState<IncomeEntry[]>([]);
   const [creditEntries, setCreditEntries] = useState<CreditEntry[]>([]);
@@ -90,6 +92,107 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
 
   const totalAmount = watch("totalAmount");
   const allocations = watch("allocations");
+
+  // Auto-allocate logic: When there's only one account, auto-fill with total amount
+  useEffect(() => {
+    if (fields.length === 1 && totalAmount && parseFloat(totalAmount) > 0) {
+      const currentAmount = allocations[0]?.amount || "";
+      const accountId = allocations[0]?.accountId || "";
+      
+      // Only auto-fill if account is selected and amount is empty or different
+      if (accountId && (!currentAmount || parseFloat(currentAmount) !== parseFloat(totalAmount))) {
+        setValue(`allocations.0.amount`, totalAmount, { shouldValidate: true });
+      }
+    }
+  }, [totalAmount, fields.length, allocations, setValue]);
+
+  // Auto-distribute remaining amount when an allocation amount changes
+  const handleAmountChange = (index: number, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    const totalIncome = parseFloat(totalAmount) || 0;
+    
+    if (!totalIncome || totalIncome <= 0) {
+      // If no total income, just set the value
+      setValue(`allocations.${index}.amount`, value, { shouldValidate: true });
+      return;
+    }
+    
+    // Set the current field's value
+    setValue(`allocations.${index}.amount`, value, { shouldValidate: true });
+    
+    // Calculate remaining amount after this allocation
+    let allocatedSoFar = 0;
+    for (let i = 0; i < fields.length; i++) {
+      if (i === index) {
+        allocatedSoFar += numValue;
+      } else {
+        allocatedSoFar += parseFloat(allocations[i]?.amount || "0") || 0;
+      }
+    }
+    
+    const remaining = totalIncome - allocatedSoFar;
+    
+    // Distribute remaining to next accounts (top to bottom)
+    if (remaining > 0 && index < fields.length - 1) {
+      // Find the next account that has an accountId selected
+      let foundNext = false;
+      for (let i = index + 1; i < fields.length; i++) {
+        const nextAccountId = allocations[i]?.accountId;
+        if (nextAccountId) {
+          // Check if there are more accounts after this one with accountId
+          const hasMoreAccounts = allocations.slice(i + 1).some(a => a.accountId);
+          
+          if (!hasMoreAccounts) {
+            // This is the last account with an accountId, give it all remaining
+            setValue(`allocations.${i}.amount`, remaining.toFixed(2), { shouldValidate: true });
+            foundNext = true;
+            break;
+          } else {
+            // There are more accounts, check if current account has amount
+            const existingAmount = parseFloat(allocations[i]?.amount || "0") || 0;
+            if (existingAmount === 0 || Math.abs(existingAmount - remaining) < 0.01) {
+              // Give remaining to this account
+              setValue(`allocations.${i}.amount`, remaining.toFixed(2), { shouldValidate: true });
+              foundNext = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      // If no next account found, clear amounts for accounts after current index
+      if (!foundNext) {
+        for (let i = index + 1; i < fields.length; i++) {
+          setValue(`allocations.${i}.amount`, "", { shouldValidate: true });
+        }
+      }
+    } else if (remaining < 0) {
+      // If over-allocated, clear subsequent allocations
+      for (let i = index + 1; i < fields.length; i++) {
+        setValue(`allocations.${i}.amount`, "", { shouldValidate: true });
+      }
+    } else if (remaining === 0) {
+      // Perfect allocation, clear any remaining allocations
+      for (let i = index + 1; i < fields.length; i++) {
+        setValue(`allocations.${i}.amount`, "", { shouldValidate: true });
+      }
+    }
+  };
+
+  // Navigation functions
+  const currentDate = parse(monthYear, "yyyy-MM", new Date());
+  const previousMonth = format(subMonths(currentDate, 1), "yyyy-MM");
+  const nextMonth = format(addMonths(currentDate, 1), "yyyy-MM");
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const isCurrentMonth = monthYear === currentMonth;
+
+  const navigateToMonth = (newMonth: string) => {
+    router.push(`/setup/${newMonth}`);
+  };
+
+  const resetToCurrentMonth = () => {
+    router.push(`/setup/${currentMonth}`);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -227,9 +330,43 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Income Management</h1>
-          <p className="text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigateToMonth(previousMonth)}
+              className="h-10 w-10"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">Income & Credits Management</h1>
+              <p className="text-gray-600">{format(currentDate, "MMMM yyyy")}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigateToMonth(nextMonth)}
+              className="h-10 w-10"
+              aria-label="Next month"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+            {!isCurrentMonth && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetToCurrentMonth}
+                className="gap-2"
+                aria-label="Reset to current month"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Current Month
+              </Button>
+            )}
+          </div>
         </div>
         <Card>
           <CardContent className="py-12">
@@ -250,9 +387,43 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Income & Credits Management</h1>
-        <p className="text-gray-600">{format(new Date(`${monthYear}-01`), "MMMM yyyy")}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigateToMonth(previousMonth)}
+            className="h-10 w-10"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">Income & Credits Management</h1>
+            <p className="text-gray-600">{format(currentDate, "MMMM yyyy")}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigateToMonth(nextMonth)}
+            className="h-10 w-10"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+          {!isCurrentMonth && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetToCurrentMonth}
+              className="gap-2"
+              aria-label="Reset to current month"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Current Month
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "income" | "credits")}>
@@ -383,7 +554,18 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ accountId: "", amount: "" })}
+                  onClick={() => {
+                    append({ accountId: "", amount: "" });
+                    // If there was only one account with full amount, redistribute when adding new account
+                    if (fields.length === 1 && totalAmount && parseFloat(totalAmount) > 0) {
+                      const firstAmount = parseFloat(allocations[0]?.amount || "0") || 0;
+                      if (firstAmount > 0) {
+                        // Keep first amount, remaining will be auto-distributed when user enters amount
+                        // Or we can auto-distribute 50-50 or keep first and leave second empty
+                        // For now, keep the first amount as is, user can adjust
+                      }
+                    }
+                  }}
                 >
                   <Plus className="h-4 w-4" />
                   Add Account
@@ -397,6 +579,10 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
                       value={watch(`allocations.${index}.accountId`)}
                       onValueChange={(value) => {
                         setValue(`allocations.${index}.accountId`, value, { shouldValidate: true });
+                        // If this is the only account and totalAmount is set, auto-fill amount
+                        if (fields.length === 1 && totalAmount && parseFloat(totalAmount) > 0) {
+                          setValue(`allocations.${index}.amount`, totalAmount, { shouldValidate: true });
+                        }
                       }}
                     >
                       <SelectTrigger>
@@ -421,6 +607,9 @@ export function SetupPage({ monthYear }: { monthYear: string }) {
                       type="text"
                       placeholder="0.00"
                       {...register(`allocations.${index}.amount`)}
+                      onChange={(e) => {
+                        handleAmountChange(index, e.target.value);
+                      }}
                     />
                     {errors.allocations?.[index]?.amount && (
                       <p className="mt-1 text-sm text-red-500">

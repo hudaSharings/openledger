@@ -395,9 +395,10 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
   // Generate list of previous months for copy
   const getPreviousMonths = () => {
     const months: string[] = [];
-    const current = parse(monthYear, "yyyy-MM", new Date());
-    for (let i = 1; i <= 12; i++) {
-      const prevMonth = subMonths(current, i);
+    const selectedMonth = parse(monthYear, "yyyy-MM", new Date());
+    // Get previous 3 months based on selected month
+    for (let i = 1; i <= 3; i++) {
+      const prevMonth = subMonths(selectedMonth, i);
       months.push(format(prevMonth, "yyyy-MM"));
     }
     return months;

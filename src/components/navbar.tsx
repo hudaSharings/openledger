@@ -5,7 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, User, LayoutDashboard, Wallet, Receipt, FileText, Settings, IndianRupee, Bell, ChevronLeft, ChevronRight } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Wallet, Receipt, FileText, Settings, IndianRupee, Bell, ChevronLeft, ChevronRight, BarChart3 } from "lucide-react";
 import { getHouseholdName } from "@/src/lib/actions/auth";
 import { useSidebar } from "./sidebar-context";
 
@@ -50,6 +50,7 @@ export function Navbar() {
     { href: "/", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
     { href: "/budget", label: "Budget", icon: Wallet, adminOnly: false },
     { href: "/transaction-log", label: "Transactions", icon: Receipt, adminOnly: false },
+    { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: false },
     { href: "/reminders", label: "Reminders", icon: Bell, adminOnly: false },
     { href: "/templates", label: "Recurring Items", icon: FileText, adminOnly: true },
     { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },

@@ -1100,3 +1100,51 @@ export async function getMonthlyReport(monthYear: string) {
 
   return transactionsList;
 }
+
+// Get all months that have data (income, budget, or transactions)
+export async function getAllMonthsWithData() {
+  const householdId = await getHouseholdId();
+
+  // Get all unique months from income entries
+  const incomeMonths = await db
+    .selectDistinct({ monthYear: incomeEntries.monthYear })
+    .from(incomeEntries)
+    .where(eq(incomeEntries.householdId, householdId));
+
+  // Get all unique months from budget items
+  const budgetMonths = await db
+    .selectDistinct({ monthYear: budgetItems.monthYear })
+    .from(budgetItems)
+    .where(eq(budgetItems.householdId, householdId));
+
+  // Get all unique months from transactions (extract year-month from date)
+  const transactionMonths = await db
+    .selectDistinct({
+      monthYear: sql<string>`to_char(${transactions.date}, 'YYYY-MM')`.as('monthYear'),
+    })
+    .from(transactions)
+    .where(eq(transactions.householdId, householdId));
+
+  // Combine all months and get unique values
+  const allMonths = new Set<string>();
+  incomeMonths.forEach((m) => allMonths.add(m.monthYear));
+  budgetMonths.forEach((m) => allMonths.add(m.monthYear));
+  transactionMonths.forEach((m) => allMonths.add(m.monthYear));
+
+  // Sort months in descending order (newest first)
+  return Array.from(allMonths).sort().reverse();
+}
+
+// Get summary data for multiple months
+export async function getMultiMonthReport(months: string[]) {
+  const results = await Promise.all(
+    months.map(async (monthYear) => {
+      const data = await getDashboardData(monthYear);
+      return {
+        monthYear,
+        ...data,
+      };
+    })
+  );
+  return results;
+}
