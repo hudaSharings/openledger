@@ -17,15 +17,17 @@ export async function getTransactionsByDate(monthYear?: string) {
   let endDate: Date;
 
   if (monthYear) {
-    startDate = new Date(`${monthYear}-01`);
-    endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 1);
-    endDate.setDate(endDate.getDate() - 1); // Adjust to last day of the month
+    // Create dates in UTC to match database storage
+    const [year, month] = monthYear.split("-").map(Number);
+    startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)); // First day of month in UTC
+    endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)); // Last day of month in UTC
   } else {
-    // Get current month
+    // Get current month in UTC
     const now = new Date();
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth();
+    startDate = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)); // First day of current month in UTC
+    endDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999)); // Last day of current month in UTC
   }
 
   const transactionsList = await db

@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { format, subMonths, addMonths, parse } from "date-fns";
-import { Trash2, Plus, Copy, Search, X, Save, ChevronLeft, ChevronRight, RotateCcw, Pencil, Lock, Filter } from "lucide-react";
+import { Trash2, Plus, Copy, Search, X, Save, ChevronLeft, ChevronRight, RotateCcw, Pencil, Lock, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/src/lib/utils";
@@ -71,6 +71,7 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
   const [editingItem, setEditingItem] = useState<BudgetItem | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all"); // "all", "mandatory", "periodic", "ad_hoc"
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
 
   const {
     register,
@@ -1314,6 +1315,352 @@ export function PlanningEntry({ monthYear }: { monthYear: string }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Account-wise Summary Table */}
+      {budgetItems.length > 0 && (
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Account-wise Budget Summary
+            </CardTitle>
+            <CardDescription>
+              Total planned amount, actual spent, and balance grouped by payment account
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Filter budget items based on category filter
+              const filteredItems = budgetItems.filter((item) => {
+                if (categoryFilter === "all") return true;
+                const categoryType = item.categoryType || "ad_hoc";
+                return categoryType === categoryFilter;
+              });
+
+              // Group budget items by account
+              const accountTotals = filteredItems.reduce((acc, item) => {
+                const accountId = item.accountId;
+                const accountName = item.accountName;
+                
+                if (!acc[accountId]) {
+                  acc[accountId] = {
+                    accountId,
+                    accountName,
+                    plannedAmount: 0,
+                    actualSpent: 0,
+                    itemCount: 0,
+                    items: [] as BudgetItem[],
+                  };
+                }
+                
+                acc[accountId].plannedAmount += parseFloat(item.amount);
+                acc[accountId].actualSpent += item.actualSpent || 0;
+                acc[accountId].itemCount += 1;
+                acc[accountId].items.push(item);
+                
+                return acc;
+              }, {} as Record<string, { accountId: string; accountName: string; plannedAmount: number; actualSpent: number; itemCount: number; items: BudgetItem[] }>);
+
+              const toggleAccount = (accountId: string) => {
+                setExpandedAccounts((prev) => {
+                  const newSet = new Set(prev);
+                  if (newSet.has(accountId)) {
+                    newSet.delete(accountId);
+                  } else {
+                    newSet.add(accountId);
+                  }
+                  return newSet;
+                });
+              };
+
+              const accountSummary = Object.values(accountTotals).sort((a, b) => 
+                b.plannedAmount - a.plannedAmount
+              );
+
+              if (accountSummary.length === 0) {
+                return (
+                  <p className="text-center text-gray-600 py-4">
+                    No budget items to summarize.
+                  </p>
+                );
+              }
+
+              const grandTotalPlanned = accountSummary.reduce((sum, acc) => sum + acc.plannedAmount, 0);
+              const grandTotalSpent = accountSummary.reduce((sum, acc) => sum + acc.actualSpent, 0);
+              const grandTotalBalance = grandTotalPlanned - grandTotalSpent;
+
+              return (
+                <>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Items</TableHead>
+                          <TableHead className="text-right">Planned Amount</TableHead>
+                          <TableHead className="text-right">Actual Spent</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accountSummary.map((account) => {
+                          const balance = account.plannedAmount - account.actualSpent;
+                          const isExpanded = expandedAccounts.has(account.accountId);
+                          return (
+                            <>
+                              <TableRow 
+                                key={account.accountId} 
+                                className="hover:bg-gray-50 cursor-pointer"
+                                onClick={() => toggleAccount(account.accountId)}
+                              >
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-500" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                                    )}
+                                    {account.accountName}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right text-gray-600">
+                                  {account.itemCount}
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  ₹{formatCurrency(account.plannedAmount)}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  ₹{formatCurrency(account.actualSpent)}
+                                </TableCell>
+                                <TableCell
+                                  className={`text-right font-medium ${
+                                    balance >= 0 ? "text-green-600" : "text-red-600"
+                                  }`}
+                                >
+                                  ₹{formatCurrency(balance)}
+                                </TableCell>
+                              </TableRow>
+                              {isExpanded && (
+                                <TableRow key={`${account.accountId}-expanded`} className="bg-gray-50">
+                                  <TableCell colSpan={5} className="p-0">
+                                    <div className="px-4 py-3">
+                                      <div className="text-sm font-semibold text-gray-700 mb-3">
+                                        Budget Items for {account.accountName}
+                                      </div>
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow className="bg-gray-100">
+                                            <TableHead className="w-[40%]">Description</TableHead>
+                                            <TableHead className="text-right">Category</TableHead>
+                                            <TableHead className="text-right">Planned</TableHead>
+                                            <TableHead className="text-right">Spent</TableHead>
+                                            <TableHead className="text-right">Balance</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {account.items.map((item) => {
+                                            const itemBalance = parseFloat(item.amount) - (item.actualSpent || 0);
+                                            return (
+                                              <TableRow key={item.id} className="hover:bg-gray-50">
+                                                <TableCell className="font-medium text-gray-900">
+                                                  {item.description}
+                                                </TableCell>
+                                                <TableCell className="text-right text-gray-600 text-sm">
+                                                  {item.categoryName}
+                                                </TableCell>
+                                                <TableCell className="text-right font-semibold">
+                                                  ₹{formatCurrency(item.amount)}
+                                                </TableCell>
+                                                <TableCell className="text-right font-medium">
+                                                  ₹{formatCurrency(item.actualSpent || 0)}
+                                                </TableCell>
+                                                <TableCell
+                                                  className={`text-right font-medium ${
+                                                    itemBalance >= 0 ? "text-green-600" : "text-red-600"
+                                                  }`}
+                                                >
+                                                  ₹{formatCurrency(itemBalance)}
+                                                </TableCell>
+                                              </TableRow>
+                                            );
+                                          })}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
+                          );
+                        })}
+                        <TableRow className="font-bold bg-gray-50">
+                          <TableCell>Grand Total</TableCell>
+                          <TableCell className="text-right text-gray-600">
+                            {accountSummary.reduce((sum, acc) => sum + acc.itemCount, 0)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ₹{formatCurrency(grandTotalPlanned)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ₹{formatCurrency(grandTotalSpent)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right ${
+                              grandTotalBalance >= 0 ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            ₹{formatCurrency(grandTotalBalance)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3">
+                    {accountSummary.map((account) => {
+                      const balance = account.plannedAmount - account.actualSpent;
+                      const isExpanded = expandedAccounts.has(account.accountId);
+                      return (
+                        <div key={account.accountId}>
+                          <div
+                            className="p-4 rounded-lg border bg-white cursor-pointer"
+                            onClick={() => toggleAccount(account.accountId)}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="font-semibold text-gray-900">
+                                {account.accountName}
+                              </div>
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5 text-gray-500" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5 text-gray-500" />
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mb-2">
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Items</div>
+                                <div className="text-sm font-medium text-gray-700">
+                                  {account.itemCount}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Planned</div>
+                                <div className="text-sm font-semibold text-gray-900">
+                                  ₹{formatCurrency(account.plannedAmount)}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Spent</div>
+                                <div className="text-sm font-medium text-gray-700">
+                                  ₹{formatCurrency(account.actualSpent)}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Balance</div>
+                                <div className={`text-sm font-semibold ${
+                                  balance >= 0 ? "text-green-600" : "text-red-600"
+                                }`}>
+                                  ₹{formatCurrency(balance)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          {isExpanded && (
+                            <div className="mt-2 p-4 rounded-lg border bg-gray-50">
+                              <div className="text-sm font-semibold text-gray-700 mb-3">
+                                Budget Items for {account.accountName}
+                              </div>
+                              <div className="overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-gray-100">
+                                      <TableHead>Description</TableHead>
+                                      <TableHead className="text-right">Category</TableHead>
+                                      <TableHead className="text-right">Planned</TableHead>
+                                      <TableHead className="text-right">Spent</TableHead>
+                                      <TableHead className="text-right">Balance</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {account.items.map((item) => {
+                                      const itemBalance = parseFloat(item.amount) - (item.actualSpent || 0);
+                                      return (
+                                        <TableRow key={item.id} className="hover:bg-gray-50">
+                                          <TableCell className="font-medium text-gray-900 text-sm">
+                                            {item.description}
+                                          </TableCell>
+                                          <TableCell className="text-right text-gray-600 text-sm">
+                                            {item.categoryName}
+                                          </TableCell>
+                                          <TableCell className="text-right font-semibold text-sm">
+                                            ₹{formatCurrency(item.amount)}
+                                          </TableCell>
+                                          <TableCell className="text-right font-medium text-sm">
+                                            ₹{formatCurrency(item.actualSpent || 0)}
+                                          </TableCell>
+                                          <TableCell
+                                            className={`text-right font-medium text-sm ${
+                                              itemBalance >= 0 ? "text-green-600" : "text-red-600"
+                                            }`}
+                                          >
+                                            ₹{formatCurrency(itemBalance)}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {/* Mobile Grand Total */}
+                    <div className="p-4 rounded-lg bg-gray-50 border-2 border-gray-200 font-bold">
+                      <div className="text-sm text-gray-600 mb-3">Grand Total</div>
+                      <div className="grid grid-cols-2 gap-3 mb-2">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Items</div>
+                          <div className="text-sm text-gray-700">
+                            {accountSummary.reduce((sum, acc) => sum + acc.itemCount, 0)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Planned</div>
+                          <div className="text-sm text-gray-900">
+                            ₹{formatCurrency(grandTotalPlanned)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Spent</div>
+                          <div className="text-sm text-gray-700">
+                            ₹{formatCurrency(grandTotalSpent)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Balance</div>
+                          <div className={`text-sm ${
+                            grandTotalBalance >= 0 ? "text-green-600" : "text-red-600"
+                          }`}>
+                            ₹{formatCurrency(grandTotalBalance)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
