@@ -11,11 +11,13 @@ export default async function LogTransactionPage() {
     redirect("/login");
   }
 
+  const isAdmin = session.user?.role === "admin";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <MainContentWrapper>
-        <TransactionLogPageClient />
+        <TransactionLogPageClient isAdmin={isAdmin} />
       </MainContentWrapper>
     </div>
   );

@@ -8,7 +8,7 @@ import { Button } from "./ui/button";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { format, subMonths, addMonths, parse } from "date-fns";
 
-export function TransactionLogPageClient() {
+export function TransactionLogPageClient({ isAdmin = false }: { isAdmin?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -46,6 +46,10 @@ export function TransactionLogPageClient() {
 
   const handleTransactionAdded = () => {
     // Trigger refresh of transaction list
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleTransactionUpdated = () => {
     setRefreshKey((prev) => prev + 1);
   };
 
@@ -93,7 +97,12 @@ export function TransactionLogPageClient() {
         </div>
         <LogPage onTransactionAdded={handleTransactionAdded} />
       </div>
-      <TransactionLogView monthYear={selectedMonth} refreshKey={refreshKey} />
+      <TransactionLogView
+        monthYear={selectedMonth}
+        refreshKey={refreshKey}
+        isAdmin={isAdmin}
+        onTransactionUpdated={handleTransactionUpdated}
+      />
     </div>
   );
 }

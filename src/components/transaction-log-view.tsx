@@ -1,19 +1,45 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getTransactionsByDate } from "@/src/lib/actions/transactions";
+import { getTransactionsByDate, updateTransaction } from "@/src/lib/actions/transactions";
+import { getCategories, getPaymentAccounts, getBudgetItems } from "@/src/lib/actions/financial";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { format } from "date-fns";
-import { Calendar, Receipt, TrendingUp, Clock, IndianRupee } from "lucide-react";
+import { Calendar, Receipt, TrendingUp, Clock, IndianRupee, Pencil } from "lucide-react";
 import { LoadingSpinner } from "./ui/loading-spinner";
 import { formatCurrency } from "@/src/lib/utils";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { transactionSchema } from "@/src/lib/validations";
+import { z } from "zod";
+import { Link as LinkIcon } from "lucide-react";
 
 interface Transaction {
   id: string;
   date: Date;
   description: string;
   amount: string;
+  categoryId: string;
+  paidFromAccountId: string;
+  budgetItemId: string | null;
   categoryName: string;
   accountName: string;
   notes: string | null;
@@ -26,10 +52,60 @@ interface GroupedTransaction {
   transactions: Transaction[];
 }
 
-export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: string; refreshKey?: number }) {
+export function TransactionLogView({
+  monthYear,
+  refreshKey,
+  isAdmin = false,
+  onTransactionUpdated,
+}: {
+  monthYear?: string;
+  refreshKey?: number;
+  isAdmin?: boolean;
+  onTransactionUpdated?: () => void;
+}) {
   const [groupedTransactions, setGroupedTransactions] = useState<GroupedTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; type: string }>>([]);
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
+  const [budgetItems, setBudgetItems] = useState<Array<{ id: string; description: string; amount: string; categoryId: string; accountId: string }>>([]);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState(false);
+  const currentMonth = monthYear || new Date().toISOString().slice(0, 7);
+
+  const editForm = useForm<z.infer<typeof transactionSchema>>({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: {
+      date: new Date().toISOString(),
+      time: format(new Date(), "HH:mm"),
+      description: "",
+      amount: "",
+      categoryId: "",
+      paidFromAccountId: "",
+      notes: "",
+      budgetItemId: undefined,
+    },
+  });
+
+  useEffect(() => {
+    if (editOpen && editingTransaction) {
+      const d = new Date(editingTransaction.date);
+      editForm.reset({
+        date: d.toISOString(),
+        time: format(d, "HH:mm"),
+        description: editingTransaction.description,
+        amount: editingTransaction.amount,
+        categoryId: editingTransaction.categoryId,
+        paidFromAccountId: editingTransaction.paidFromAccountId,
+        notes: editingTransaction.notes ?? "",
+        budgetItemId: editingTransaction.budgetItemId ?? undefined,
+      });
+      setEditError(null);
+      setEditSuccess(false);
+    }
+  }, [editOpen, editingTransaction]);
 
   useEffect(() => {
     async function loadTransactions() {
@@ -47,6 +123,21 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
     }
     loadTransactions();
   }, [monthYear, refreshKey]);
+
+  useEffect(() => {
+    async function loadEditData() {
+      if (!editOpen || !editingTransaction) return;
+      const [cats, accs, items] = await Promise.all([
+        getCategories(),
+        getPaymentAccounts(),
+        getBudgetItems(currentMonth),
+      ]);
+      setCategories(cats);
+      setAccounts(accs);
+      setBudgetItems(items);
+    }
+    loadEditData();
+  }, [editOpen, editingTransaction, currentMonth]);
 
   if (loading) {
     return (
@@ -117,6 +208,7 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
   const unplannedCount = totalTransactions - plannedCount;
 
   return (
+    <>
     <Card className="shadow-lg border-gray-200">
       <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -211,6 +303,9 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
                         </TableHead>
                         <TableHead className="min-w-[200px]">Description</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
+                        {isAdmin && (
+                          <TableHead className="w-[80px] text-right">Actions</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -253,6 +348,22 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
                               )}
                             </div>
                           </TableCell>
+                          {isAdmin && (
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-600 hover:text-blue-600"
+                                aria-label="Edit transaction"
+                                onClick={() => {
+                                  setEditingTransaction(transaction);
+                                  setEditOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -281,10 +392,24 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
                             </div>
                           )}
                         </div>
-                        <div className="text-right flex-shrink-0">
+                        <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                           <div className="font-bold text-red-600 text-lg">
                             ₹{formatCurrency(transaction.amount)}
                           </div>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-gray-600 hover:text-blue-600"
+                              onClick={() => {
+                                setEditingTransaction(transaction);
+                                setEditOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -312,5 +437,210 @@ export function TransactionLogView({ monthYear, refreshKey }: { monthYear?: stri
         </div>
       </CardContent>
     </Card>
+
+    {/* Edit Transaction Dialog (Admin only) */}
+    <Dialog
+      open={editOpen}
+      onOpenChange={(open) => {
+        setEditOpen(open);
+        if (!open) setEditingTransaction(null);
+      }}
+    >
+      <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl">Edit Transaction</DialogTitle>
+          <DialogDescription>
+            Update the transaction with the correct values. Only admins can edit.
+          </DialogDescription>
+        </DialogHeader>
+        {editingTransaction && (
+          <form
+            onSubmit={editForm.handleSubmit(async (data) => {
+              setEditError(null);
+              const dateValue = editForm.watch("date");
+              const timeValue = editForm.watch("time") || format(new Date(), "HH:mm");
+              let dateObj: Date;
+              if (typeof dateValue === "string" && dateValue.includes("T")) {
+                dateObj = new Date(dateValue);
+              } else {
+                const dateStr = dateValue ? format(new Date(dateValue), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+                const [hours, minutes] = timeValue.split(":");
+                dateObj = new Date(`${dateStr}T${hours}:${minutes}:00`);
+              }
+              const result = await updateTransaction(editingTransaction.id, {
+                ...data,
+                date: dateObj.toISOString(),
+              });
+              if (result?.error) {
+                setEditError(result.error);
+                return;
+              }
+              setEditSuccess(true);
+              setTimeout(() => {
+                setEditOpen(false);
+                setEditingTransaction(null);
+                onTransactionUpdated?.();
+              }, 1000);
+            })}
+            className="space-y-4 mt-4"
+          >
+            <div className="space-y-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <LinkIcon className="h-4 w-4 text-green-600" />
+                Link to Budget Item (Optional)
+              </Label>
+              <Select
+                value={editForm.watch("budgetItemId") || "none"}
+                onValueChange={(value) =>
+                  editForm.setValue("budgetItemId", value === "none" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="h-10 bg-white">
+                  <SelectValue placeholder="Select (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Unplanned)</SelectItem>
+                  {budgetItems.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.description} - ₹{parseFloat(item.amount).toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={
+                    editForm.watch("date")
+                      ? format(new Date(editForm.watch("date")), "yyyy-MM-dd")
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const timeValue = editForm.watch("time") || "00:00";
+                    const [hours, minutes] = timeValue.split(":");
+                    const d = new Date(e.target.value + `T${hours}:${minutes}:00`);
+                    editForm.setValue("date", d.toISOString());
+                  }}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Time</Label>
+                <Input
+                  type="time"
+                  {...editForm.register("time")}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Amount (₹)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  {...editForm.register("amount")}
+                  className="h-10"
+                />
+                {editForm.formState.errors.amount && (
+                  <p className="text-sm text-red-500">{editForm.formState.errors.amount.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  {...editForm.register("description")}
+                  placeholder="Description"
+                  className="h-10"
+                />
+                {editForm.formState.errors.description && (
+                  <p className="text-sm text-red-500">{editForm.formState.errors.description.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select
+                  value={editForm.watch("categoryId")}
+                  onValueChange={(v) => editForm.setValue("categoryId", v)}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.type})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Paid From Account</Label>
+                <Select
+                  value={editForm.watch("paidFromAccountId")}
+                  onValueChange={(v) => editForm.setValue("paidFromAccountId", v)}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Notes (Optional)</Label>
+                <Input {...editForm.register("notes")} className="h-10" />
+              </div>
+            </div>
+            {editError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{editError}</p>
+              </div>
+            )}
+            {editSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-600 font-medium">✓ Transaction updated successfully!</p>
+              </div>
+            )}
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setEditOpen(false);
+                  setEditingTransaction(null);
+                }}
+                disabled={editForm.formState.isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                disabled={editForm.formState.isSubmitting}
+              >
+                {editForm.formState.isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingSpinner size="sm" className="border-white" />
+                    Saving...
+                  </span>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

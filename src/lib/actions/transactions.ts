@@ -4,6 +4,8 @@ import { db } from "@/src/db";
 import { transactions, categories, paymentAccounts, budgetItems } from "@/src/db/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { getServerSession } from "@/src/lib/get-session";
+import { transactionSchema } from "@/src/lib/validations";
+import { z } from "zod";
 
 export async function getTransactionsByDate(monthYear?: string) {
   const session = await getServerSession();
@@ -36,6 +38,9 @@ export async function getTransactionsByDate(monthYear?: string) {
       date: transactions.date,
       description: transactions.description,
       amount: transactions.amount,
+      categoryId: transactions.categoryId,
+      paidFromAccountId: transactions.paidFromAccountId,
+      budgetItemId: transactions.budgetItemId,
       categoryName: categories.name,
       accountName: paymentAccounts.name,
       notes: transactions.notes,
@@ -81,4 +86,52 @@ export async function getTransactionsByDate(monthYear?: string) {
           }),
         })),
     }));
+}
+
+export async function updateTransaction(
+  transactionId: string,
+  data: z.infer<typeof transactionSchema>
+) {
+  const session = await getServerSession();
+  if (!session?.user?.householdId) {
+    return { error: "Unauthorized" };
+  }
+  if (session.user.role !== "admin") {
+    return { error: "Only admins can edit transactions" };
+  }
+
+  const validated = transactionSchema.safeParse(data);
+  if (!validated.success) {
+    return { error: "Invalid transaction data" };
+  }
+
+  const [existing] = await db
+    .select()
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.id, transactionId),
+        eq(transactions.householdId, session.user.householdId)
+      )
+    )
+    .limit(1);
+
+  if (!existing) {
+    return { error: "Transaction not found" };
+  }
+
+  await db
+    .update(transactions)
+    .set({
+      date: new Date(validated.data.date),
+      description: validated.data.description,
+      amount: validated.data.amount,
+      categoryId: validated.data.categoryId,
+      paidFromAccountId: validated.data.paidFromAccountId,
+      notes: validated.data.notes ?? null,
+      budgetItemId: validated.data.budgetItemId ?? null,
+    })
+    .where(eq(transactions.id, transactionId));
+
+  return { success: true };
 }
